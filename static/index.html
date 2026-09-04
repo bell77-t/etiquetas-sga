@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SGA Label Studio - Visor y Generador de Etiquetas Fitosanitarias</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              900: '#064e3b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 antialiased flex flex-col">
+
+  <!-- Interfaz de Usuario Normal -->
+  <div id="app-root" class="flex flex-col flex-1">
+    
+    <!-- Top Navbar -->
+    <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md border-b border-slate-800">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <!-- Logo / Titulo -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/30">
+            <i data-lucide="tag" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              SGA Label Studio <span class="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-normal">v2.3</span>
+            </h1>
+            <p class="text-xs text-slate-400">Visor y Generador de Mezclas Fitosanitarias</p>
+          </div>
+        </div>
+
+        <!-- Metricas de Cabecera -->
+        <div class="hidden md:flex items-center space-x-6 text-xs text-slate-300">
+          <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Excel: <strong id="lbl-excel-path" class="text-emerald-300 font-mono">Cargando...</strong></span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="calendar" class="w-4 h-4 text-emerald-400"></i>
+            <span>Fechas: <strong id="metric-dates" class="text-white">0</strong></span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="flask-conical" class="w-4 h-4 text-emerald-400"></i>
+            <span>Lotes: <strong id="metric-apps" class="text-white">0</strong></span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="printer" class="w-4 h-4 text-emerald-400"></i>
+            <span>Etiquetas Tanque: <strong id="metric-labels" class="text-white">0</strong></span>
+          </div>
+        </div>
+
+        <!-- Acciones Principales -->
+        <div class="flex items-center space-x-2">
+          <button id="btn-reload" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold transition border border-slate-700 shadow-sm" title="Releer archivos Excel en caliente">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <span>Recargar Excel</span>
+          </button>
+          <button id="btn-config" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Configurar Directorio">
+            <i data-lucide="folder-search" class="w-5 h-5"></i>
+          </button>
+          <button id="btn-print-selection" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-md shadow-emerald-600/30">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            <span>Imprimir (<span id="selected-print-count">0</span>)</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Panel Izquierdo: Filtros y Lista de Aplicaciones (7 columnas) -->
+      <section class="lg:col-span-7 flex flex-col space-y-4">
+        
+        <!-- Barra de Búsqueda y Filtros -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 space-y-3">
+          
+          <!-- Filtro por Fecha (Pills Horizontales) -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <i data-lucide="calendar-days" class="w-4 h-4 text-emerald-600"></i>
+                Fecha de Aplicación
+              </label>
+              <button id="btn-clear-date" class="text-xs text-emerald-600 hover:underline font-semibold hidden">
+                Mostrar todas
+              </button>
+            </div>
+            <div id="date-pills" class="flex flex-wrap gap-1.5">
+              <!-- Se puebla dinamicamente -->
+            </div>
+          </div>
+
+          <hr class="border-slate-100">
+
+          <!-- Buscador por Producto y Texto -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="relative">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Producto Fitosanitario</label>
+              <div class="relative">
+                <select id="select-product" class="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-3 pr-8 text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none truncate">
+                  <option value="">Todos los Productos...</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Búsqueda rápida</label>
+              <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" id="input-search" placeholder="Sector, Bloque, Dosis..." class="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-9 pr-3 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              </div>
+            </div>
+          </div>
+
+          <!-- Opciones de Impresión, Disposición y Cantidad de Copias -->
+          <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200/90 space-y-2.5">
+            <div class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="settings-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Opciones de Impresión para Fotocopias / Stickers</span>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <!-- Disposición de Página -->
+              <div>
+                <label class="block text-slate-600 font-medium mb-1">Disposición en Papel:</label>
+                <select id="select-print-layout" class="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  <option value="continuous" selected>📜 1 Columna Continua (Como en Excel)</option>
+                  <option value="2columns">📑 2 Columnas (Ahorro / Fotocopia 4-6 por hoja)</option>
+                  <option value="1perpage">📄 1 Etiqueta por Hoja (Térmica / Rollo)</option>
+                  <option value="2perpage">📑 2 Etiquetas por Hoja (Media Carta)</option>
+                </select>
+              </div>
+
+              <!-- Límite de Tanques por Lote -->
+              <div>
+                <label class="block text-slate-600 font-medium mb-1">Tanques por Lote:</label>
+                <select id="select-tanks-mode" class="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  <option value="all" selected>Todos los tanques</option>
+                  <option value="1">Solo 1 tanque representativo</option>
+                  <option value="2">Máx. 2 tanques</option>
+                  <option value="3">Máx. 3 tanques</option>
+                  <option value="5">Máx. 5 tanques</option>
+                  <option value="10">Máx. 10 tanques</option>
+                </select>
+              </div>
+
+              <!-- Copias por cada etiqueta (Multiplicador) -->
+              <div>
+                <label class="block text-slate-600 font-medium mb-1">Copias de cada una:</label>
+                <div class="flex items-center bg-white rounded-md border border-slate-300 p-0.5">
+                  <button id="btn-batch-copies-minus" type="button" class="w-7 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs">-</button>
+                  <input type="number" id="input-batch-copies" value="1" min="1" max="500" class="w-full text-center font-bold text-slate-900 text-xs focus:outline-none">
+                  <button id="btn-batch-copies-plus" type="button" class="w-7 h-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Barra de selección y conteos -->
+          <div class="flex items-center justify-between pt-1 text-xs text-slate-500">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="check-select-all" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer">
+              <label for="check-select-all" class="cursor-pointer font-medium text-slate-700">Seleccionar todos los lotes filtrados</label>
+            </div>
+            <div>
+              Mostrando <strong id="count-filtered-apps" class="text-slate-800">0</strong> lotes (<strong id="count-filtered-labels" class="text-slate-800">0</strong> tanques)
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de Tarjetas de Aplicación -->
+        <div id="applications-list" class="space-y-3 flex-1">
+          <!-- Tarjetas generadas dinámicamente -->
+        </div>
+
+      </section>
+
+      <!-- Panel Derecho: Visor de Etiqueta Activa (5 columnas) -->
+      <section class="lg:col-span-5 flex flex-col space-y-4">
+        
+        <!-- Contenedor del Preview -->
+        <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200/80 sticky top-20 flex flex-col space-y-3">
+          
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="eye" class="w-5 h-5 text-emerald-600"></i>
+              <h2 class="font-bold text-slate-800 text-sm">Vista Previa SGA</h2>
+            </div>
+            
+            <!-- Selector de Copias para Vista Previa -->
+            <div class="flex items-center gap-2">
+              <div class="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200 text-xs">
+                <label class="text-slate-600 font-semibold px-1 text-[11px]">Copias:</label>
+                <button id="btn-preview-copies-minus" type="button" class="w-5 h-5 bg-white hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center border text-[11px] shadow-xs">-</button>
+                <input type="number" id="input-preview-copies" value="1" min="1" max="500" class="w-9 text-center bg-transparent font-bold text-slate-900 text-xs focus:outline-none">
+                <button id="btn-preview-copies-plus" type="button" class="w-5 h-5 bg-white hover:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center border text-[11px] shadow-xs">+</button>
+              </div>
+
+              <button id="btn-print-preview" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm" title="Imprimir las copias seleccionadas">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                <span>Imprimir (<span id="preview-copies-badge">1</span>)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Selector Compacto de Tanques (1 sola línea) -->
+          <div id="tank-selector-container" class="hidden flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs">
+            <div class="flex items-center gap-1.5 font-bold text-slate-700">
+              <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
+              <span>Tanque:</span>
+            </div>
+            
+            <div class="flex items-center gap-1.5 flex-1 justify-end">
+              <button id="btn-prev-tank" type="button" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded border border-slate-300 font-bold transition shadow-xs" title="Tanque anterior">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              </button>
+              
+              <select id="select-active-tank" class="bg-white border border-slate-300 rounded py-1 px-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none truncate max-w-[220px]">
+                <!-- Opciones dinámicas -->
+              </select>
+
+              <button id="btn-next-tank" type="button" class="p-1 bg-white hover:bg-slate-100 text-slate-700 rounded border border-slate-300 font-bold transition shadow-xs" title="Tanque siguiente">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Render de la Etiqueta Fitosanitaria Real (Réplica Excel A2:F12) -->
+          <div id="label-preview-card" class="bg-slate-50 p-2 sm:p-3 rounded-lg border border-slate-200 overflow-y-auto max-h-[calc(100vh-210px)] flex justify-center">
+            <div class="text-center text-slate-400 py-12 flex flex-col items-center">
+              <i data-lucide="layout" class="w-12 h-12 stroke-[1.5] mb-2 text-slate-300"></i>
+              <p class="text-xs">Selecciona una aplicación o tanque para previsualizar la etiqueta</p>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400 mt-auto">
+      <span>Sistema Visor SGA Fitosanitario &bull; Lectura no bloqueante de Excel en tiempo real</span>
+    </footer>
+
+  </div>
+
+  <!-- Modal de Configuración de Directorio -->
+  <div id="modal-config" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4 border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <i data-lucide="folder" class="w-5 h-5 text-emerald-600"></i>
+          Ubicación de Archivos Excel
+        </h3>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-600">
+        Directorio donde se encuentran los archivos <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">aplicacion.xlsm</code>, <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">Base.xlsx</code> y la carpeta <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">Picto/</code>:
+      </p>
+      <div>
+        <input type="text" id="input-dir-path" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="btn-cancel-modal" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancelar</button>
+        <button id="btn-save-dir" class="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition shadow-md shadow-emerald-600/30">Guardar y Recargar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast de Notificaciones -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-xs z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <i id="toast-icon" data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+    <span id="toast-msg">Mensaje</span>
+  </div>
+
+  <!-- CONTENEDOR EXCLUSIVO PARA IMPRESIÓN (@media print) -->
+  <div id="print-container" style="display: none;"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

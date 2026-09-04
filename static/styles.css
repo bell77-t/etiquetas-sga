@@ -1,0 +1,303 @@
+/* =========================================================
+   SGA Label Studio - Réplica Exacta Plantilla Física Excel (A2:F12)
+   Optimizado para Fichas Bibliográficas / Stickers y Fotocopias
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f8fafc;
+  color: #000000;
+  margin: 0;
+  padding: 0;
+}
+
+/* Scrollbar para interfaz */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* =========================================================
+   ESTRUCTURA DE ETIQUETA IDÉNTICA A EXCEL (A2:F12)
+   ========================================================= */
+.etiqueta-card {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  background: #ffffff;
+  box-sizing: border-box;
+  page-break-inside: avoid;
+  break-inside: avoid;
+  font-family: Arial, Helvetica, sans-serif;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.etiqueta-excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1.5px solid #000000;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #ffffff;
+  color: #000000;
+  table-layout: fixed;
+}
+
+.etiqueta-excel-table td,
+.etiqueta-excel-table th {
+  border: 1.5px solid #000000;
+  padding: 3px 5px;
+  font-family: Arial, Helvetica, sans-serif;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+/* Fila 1 (Excel A2:D2 y E2:F2) */
+.cell-producto {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 5px 6px !important;
+  color: #000000;
+}
+
+.cell-advertencia {
+  font-size: 12.5px;
+  font-weight: bold;
+  text-transform: uppercase;
+  text-align: center;
+  color: #000000;
+  letter-spacing: 0.5px;
+}
+
+/* Filas 2 a 4 (Excel A3:D5) */
+.cell-lbl {
+  font-size: 9.5px;
+  font-weight: bold;
+  text-transform: uppercase;
+  width: 20%;
+  background-color: #f8fafc;
+  color: #000000;
+}
+
+.cell-val {
+  font-size: 10px;
+  width: 22%;
+  color: #000000;
+}
+
+.cell-lbl-sub {
+  font-size: 9px;
+  font-weight: bold;
+  text-transform: uppercase;
+  width: 20%;
+  background-color: #f1f5f9;
+  color: #000000;
+}
+
+.cell-val-sub {
+  font-size: 9.5px;
+  font-weight: bold;
+  width: 22%;
+  color: #000000;
+}
+
+/* Celdas espaciadoras con bordes sólidos (Excel A6:D8) */
+.cell-empty {
+  height: 12px;
+  background-color: #ffffff;
+}
+
+/* Bloque Superior Derecho: Matriz 2x2 Pictogramas (Excel E3:F8) */
+.cell-picto {
+  width: 62px;
+  height: 62px;
+  min-width: 62px;
+  max-width: 62px;
+  text-align: center;
+  vertical-align: middle;
+  padding: 2px !important;
+  background-color: #ffffff;
+}
+
+.cell-picto img {
+  width: 52px;
+  height: 52px;
+  max-width: 52px;
+  max-height: 52px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Contenedor estándar SIN IMAGEN */
+.sin-imagen-box {
+  width: 52px;
+  height: 52px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background-color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 8.5px;
+  font-weight: bold;
+  color: #94a3b8;
+  line-height: 1.1;
+  margin: 0 auto;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Bloque Inferior: Frases H y P (Excel A9:F12) */
+.cell-sec-header {
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 3px 5px !important;
+  background-color: #f1f5f9;
+  color: #000000;
+  letter-spacing: 0.5px;
+}
+
+.cell-frase-content {
+  font-size: 9.5px;
+  line-height: 1.35;
+  padding: 5px 6px !important;
+  text-align: left;
+  white-space: pre-line;
+  word-break: break-word;
+  color: #000000;
+}
+
+/* =========================================================
+   REGLAS DE IMPRESIÓN Y FOTOCOPIAS (@media print)
+   ========================================================= */
+@media print {
+  @page {
+    margin: 6mm 5mm;
+    size: auto;
+  }
+
+  body {
+    background: transparent !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print, nav, header, aside, .filter-bar, .modal-backdrop, button, .ui-controls, #app-root {
+    display: none !important;
+  }
+
+  #print-container {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+
+  .etiqueta-excel-table {
+    border: 1.5px solid #000000 !important;
+    width: 100% !important;
+  }
+
+  .etiqueta-excel-table td,
+  .etiqueta-excel-table th {
+    border: 1.5px solid #000000 !important;
+    color: #000000 !important;
+  }
+
+  .cell-lbl, .cell-lbl-sub, .cell-sec-header {
+    background-color: #f1f5f9 !important;
+  }
+
+  .sin-imagen-box {
+    border: 1px solid #94a3b8 !important;
+    color: #64748b !important;
+  }
+
+  /* 1. MODO COLUMNA CONTINUA (SEGUIDAS COMO EN EXCEL / FOTOCOPIAS) */
+  #print-container.print-layout-continuous {
+    display: block !important;
+  }
+
+  #print-container.print-layout-continuous .etiqueta-card {
+    break-after: auto !important;
+    page-break-after: auto !important;
+    margin: 0 auto 6mm auto !important;
+    width: 125mm !important;
+    max-width: 125mm !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 2. MODO 2 COLUMNAS (MÁXIMO APROVECHAMIENTO DE HOJA PARA FOTOCOPIAR 4-6 POR HOJA) */
+  #print-container.print-layout-2columns {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 5mm !important;
+    width: 100% !important;
+  }
+
+  #print-container.print-layout-2columns .etiqueta-card {
+    break-after: auto !important;
+    page-break-after: auto !important;
+    margin: 0 auto 5mm auto !important;
+    width: 95mm !important;
+    max-width: 95mm !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 3. MODO 1 POR HOJA (TÉRMICA / ROLLO) */
+  #print-container.print-layout-1perpage .etiqueta-card {
+    break-after: page !important;
+    page-break-after: always !important;
+    margin: 0 auto 0 auto !important;
+    width: 100% !important;
+    max-width: 100mm !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  #print-container.print-layout-1perpage .etiqueta-card:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  /* 4. MODO 2 POR HOJA */
+  #print-container.print-layout-2perpage .etiqueta-card {
+    break-after: auto !important;
+    page-break-after: auto !important;
+    margin: 0 auto 10mm auto !important;
+    width: 130mm !important;
+    max-width: 130mm !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  #print-container.print-layout-2perpage .etiqueta-card:nth-child(2n) {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+}
