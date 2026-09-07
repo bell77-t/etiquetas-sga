@@ -14,15 +14,17 @@ DEFAULT_SEARCH_PATHS = [
 ]
 
 def find_data_directory(custom_path: Optional[str] = None) -> Path:
-    """Busca el directorio que contiene los archivos aplicacion.xlsm, Base.xlsx y Picto."""
+    """Busca el directorio que contiene los archivos aplicacion.xlsm, Base_Actualizada.xlsx / Base.xlsx y Picto."""
     if custom_path and os.path.exists(custom_path):
         p = Path(custom_path)
-        if (p / "aplicacion.xlsm").exists() or (p / "Base.xlsx").exists():
+        if (p / "aplicacion.xlsm").exists() or (p / "Base_Actualizada.xlsx").exists() or (p / "Base.xlsx").exists():
             return p
 
     for path in DEFAULT_SEARCH_PATHS:
         if path.exists():
-            if (path / "aplicacion.xlsm").exists() and (path / "Base.xlsx").exists():
+            has_app = (path / "aplicacion.xlsm").exists()
+            has_base = (path / "Base_Actualizada.xlsx").exists() or (path / "Base.xlsx").exists()
+            if has_app and has_base:
                 return path
 
     for path in DEFAULT_SEARCH_PATHS:
@@ -118,7 +120,14 @@ def load_base_catalog(base_path: Path, picto_dir: Path) -> Dict[str, Dict[str, A
     buf = read_file_bytes_non_blocking(base_path)
     wb = openpyxl.load_workbook(buf, data_only=True, read_only=True)
     
-    sheet_name = "SGA" if "SGA" in wb.sheetnames else wb.sheetnames[0]
+    # Buscar hoja que contenga 'SGA' (ej. 'SGA AJ', 'SGA', etc.)
+    sheet_name = None
+    for s in wb.sheetnames:
+        if "SGA" in s.upper():
+            sheet_name = s
+            break
+    if not sheet_name:
+        sheet_name = wb.sheetnames[0]
     ws = wb[sheet_name]
 
     picto_catalog = get_pictogram_catalog(picto_dir)
@@ -463,15 +472,48 @@ class DataManager:
         if not picto_dir.exists():
             picto_dir = Path(__file__).resolve().parent / "Picto"
 
-        base_path = self.data_dir / "Base.xlsx"
+        # Buscar archivo maestro de productos priorizando Base_Actualizada.xlsx
+        base_candidates = [
+            self.data_dir / "Base_Actualizada.xlsx",
+            self.data_dir / "base_Actualizada.xlsx",
+            self.data_dir / "Base_actualizada.xlsx",
+            self.data_dir / "base_actualizada.xlsx",
+            self.data_dir / "Base.xlsx",
+            self.data_dir / "base.xlsx",
+        ]
+        base_path = None
+        for cand in base_candidates:
+            if cand.exists():
+                base_path = cand
+                break
+
+        if not base_path:
+            for f in self.data_dir.glob("*.xlsx"):
+                if "base" in f.name.lower():
+                    base_path = f
+                    break
+
         app_path = self.data_dir / "aplicacion.xlsm"
 
-        if not base_path.exists():
-            raise FileNotFoundError(f"No se encontró Base.xlsx en {self.data_dir}")
+        if not base_path or not base_path.exists():
+            raise FileNotFoundError(f"No se encontró Base_Actualizada.xlsx ni Base.xlsx en {self.data_dir}")
         if not app_path.exists():
             raise FileNotFoundError(f"No se encontró aplicacion.xlsm en {self.data_dir}")
 
+        self.base_filename = base_path.name
         self.base_catalog = load_base_catalog(base_path, picto_dir)
+
+        # Si existe Base.xlsx anterior y la base activa es Base_Actualizada.xlsx, complementar productos faltantes
+        legacy_base = self.data_dir / "Base.xlsx"
+        if legacy_base.exists() and legacy_base.resolve() != base_path.resolve():
+            try:
+                legacy_catalog = load_base_catalog(legacy_base, picto_dir)
+                for k, v in legacy_catalog.items():
+                    if k not in self.base_catalog:
+                        self.base_catalog[k] = v
+            except Exception:
+                pass
+
         self.applications = load_applications(app_path, self.base_catalog)
         self.last_loaded = datetime.datetime.now()
 
@@ -497,6 +539,7 @@ class DataManager:
         total_labels = sum(len(a["etiquetas"]) for a in self.applications)
         return {
             "data_directory": str(self.data_dir),
+            "base_file": getattr(self, "base_filename", "Base_Actualizada.xlsx"),
             "last_loaded": self.last_loaded.strftime("%Y-%m-%d %H:%M:%S") if self.last_loaded else None,
             "total_applications": total_apps,
             "total_labels": total_labels,

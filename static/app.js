@@ -273,8 +273,9 @@ async function reloadExcelData() {
 function updateHeaderSummary() {
   if (!state.summary) return;
   const dirName = state.summary.data_directory.split(/[\\/]/).pop() || state.summary.data_directory;
-  dom.lblExcelPath.textContent = dirName;
-  dom.lblExcelPath.title = state.summary.data_directory;
+  const baseFile = state.summary.base_file ? ` / ${state.summary.base_file}` : "";
+  dom.lblExcelPath.textContent = `${dirName}${baseFile}`;
+  dom.lblExcelPath.title = `${state.summary.data_directory} (${state.summary.base_file || 'Base'})`;
   dom.metricDates.textContent = state.summary.available_dates.length;
   dom.metricApps.textContent = state.summary.total_applications;
   dom.metricLabels.textContent = state.summary.total_labels;
@@ -288,17 +289,17 @@ function renderDatePills() {
   state.summary.available_dates.forEach(d => {
     const isSelected = state.selectedDate === d.iso;
     const btn = document.createElement("button");
-    btn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border ${
+    btn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 border ${
       isSelected 
-        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" 
-        : "bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200"
+        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/25 ring-2 ring-emerald-600/20" 
+        : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-slate-200/80 shadow-2xs"
     }`;
     
     const count = state.applications.filter(a => a.fecha.iso === d.iso).length;
     
     btn.innerHTML = `
       <span>${d.display}</span>
-      <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-200 text-slate-600'}">${count}</span>
+      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${isSelected ? 'bg-emerald-700 text-emerald-50' : 'bg-slate-200/80 text-slate-500'}">${count}</span>
     `;
 
     btn.addEventListener("click", () => {
@@ -401,68 +402,68 @@ function renderApplicationsList() {
     const pictosReales = (app.base_info.pictogramas || []).filter(p => p.has_image);
 
     const card = document.createElement("div");
-    card.className = `bg-white rounded-xl p-4 border transition-all duration-200 cursor-pointer ${
+    card.className = `rounded-xl p-4 border transition-all duration-200 cursor-pointer hover:-translate-y-0.5 hover:shadow-md ${
       isActive 
-        ? "border-emerald-500 ring-2 ring-emerald-500/20 shadow-md" 
-        : "border-slate-200/90 hover:border-slate-300 shadow-sm"
+        ? "bg-emerald-50/25 border-slate-200 border-l-4 border-l-emerald-600 shadow-sm ring-1 ring-emerald-600/10" 
+        : "bg-white border-slate-200/90 hover:border-slate-300 shadow-2xs"
     }`;
 
     card.innerHTML = `
       <div class="flex items-start justify-between gap-3">
         <div class="pt-0.5" onclick="event.stopPropagation()">
-          <input type="checkbox" data-app-id="${app.id}" class="app-checkbox w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer" ${isSelected ? 'checked' : ''}>
+          <input type="checkbox" data-app-id="${app.id}" class="app-checkbox w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer transition" ${isSelected ? 'checked' : ''}>
         </div>
 
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1 flex-wrap">
             <span class="font-bold text-slate-900 text-sm truncate">${app.producto}</span>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              isDanger ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+            <span class="text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full shadow-2xs ${
+              isDanger ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
             }">
               ${app.base_info.palabra_advertencia || 'PELIGRO'}
             </span>
-            <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+            <span class="text-[10px] bg-slate-100 text-slate-600 border border-slate-200/70 px-2 py-0.5 rounded-full font-medium">
               ${app.sector_bloque}
             </span>
           </div>
 
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-600 mt-2">
             <div>
-              <span class="text-[10px] text-slate-400 block uppercase">Vol. Total Lote</span>
+              <span class="text-[10px] text-slate-400 block uppercase font-medium">Vol. Total Lote</span>
               <strong class="text-slate-800 font-mono">${formatNumber(app.litros_total)} L</strong>
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 block uppercase">Dosis / L</span>
+              <span class="text-[10px] text-slate-400 block uppercase font-medium">Dosis / L</span>
               <strong class="text-slate-800 font-mono">${app.dosis}</strong>
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 block uppercase">Total Producto</span>
+              <span class="text-[10px] text-slate-400 block uppercase font-medium">Total Producto</span>
               <strong class="text-slate-800 font-mono">${formatNumber(app.total_producto)} ${app.base_info.um}</strong>
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 block uppercase">Fecha Aplicación</span>
+              <span class="text-[10px] text-slate-400 block uppercase font-medium">Fecha Aplicación</span>
               <strong class="text-slate-800">${app.fecha.display}</strong>
             </div>
           </div>
 
           <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs flex-wrap gap-2">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded text-[11px] font-bold border border-emerald-200">
+              <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-emerald-200/80 shadow-2xs">
                 <i data-lucide="layers" class="w-3.5 h-3.5"></i>
                 <span>${totalTanks} ${totalTanks === 1 ? 'Etiqueta' : 'Etiquetas'}</span>
               </span>
-              ${hasColita ? `<span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-[10px] font-semibold border border-amber-200">Incluye Colita (${formatNumber(app.litros_total % 1000)} L)</span>` : ''}
+              ${hasColita ? `<span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg text-[10px] font-semibold border border-amber-200/80 shadow-2xs">Incluye Colita (${formatNumber(app.litros_total % 1000)} L)</span>` : ''}
               
               ${pictosReales.length > 0 
-                ? `<span class="bg-red-50 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-200">
+                ? `<span class="bg-red-50 text-red-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-red-200 shadow-2xs">
                      🖼️ ${pictosReales.map(p => p.code || 'GHS').join(', ')}
                    </span>`
-                : `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[10px] font-medium">
+                : `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg text-[10px] font-medium border border-slate-200/60">
                      Sin fotos en Base.xlsx
                    </span>`
               }
             </div>
-            <button class="text-emerald-600 hover:text-emerald-700 font-semibold text-xs flex items-center gap-1">
+            <button class="text-emerald-600 hover:text-emerald-700 font-semibold text-xs flex items-center gap-1 transition-colors">
               <span>Ver Plantilla Excel</span>
               <i data-lucide="chevron-right" class="w-4 h-4"></i>
             </button>
@@ -525,9 +526,11 @@ function updateSelectionUI() {
   dom.selectedPrintCount.textContent = totalSelectedLabels;
   
   if (totalSelectedLabels > 0) {
-    dom.btnPrintSelection.classList.remove("opacity-50", "pointer-events-none");
+    dom.btnPrintSelection.classList.remove("opacity-40", "pointer-events-none");
+    dom.btnPrintSelection.classList.add("ring-2", "ring-emerald-400/40", "shadow-lg", "shadow-emerald-600/30");
   } else {
-    dom.btnPrintSelection.classList.add("opacity-50");
+    dom.btnPrintSelection.classList.add("opacity-40", "pointer-events-none");
+    dom.btnPrintSelection.classList.remove("ring-2", "ring-emerald-400/40", "shadow-lg", "shadow-emerald-600/30");
   }
 }
 
@@ -536,7 +539,8 @@ function setActiveApp(app, labelIndex = 0) {
   state.activeLabelIndex = labelIndex;
 
   document.querySelectorAll("#applications-list > div").forEach(el => {
-    el.classList.remove("border-emerald-500", "ring-2", "ring-emerald-500/20", "shadow-md");
+    el.classList.remove("bg-emerald-50/25", "border-l-4", "border-l-emerald-600", "ring-1", "ring-emerald-600/10", "border-emerald-500", "ring-2", "ring-emerald-500/20", "shadow-md");
+    el.classList.add("bg-white", "border-slate-200/90");
   });
 
   renderActiveLabelPreview();
@@ -554,11 +558,13 @@ function generateExcelLabelHTML(label) {
   const p3 = pictos[2] || { has_image: false };
   const p4 = pictos[3] || { has_image: false };
 
+  const emptyPictoBox = `<div class="sin-imagen-box" title="Sin pictograma"><svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 5 L43 24 L24 43 L5 24 Z" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 3" fill="#f8fafc"/><circle cx="24" cy="24" r="2" fill="#94a3b8"/></svg></div>`;
+
   function renderPictoCell(p) {
     if (p && p.has_image && p.url) {
-      return `<img src="${p.url}" alt="${p.label || 'Pictograma'}" onerror="this.parentElement.innerHTML='<div class=\\\'sin-imagen-box\\\'><span>SIN</span><span>IMAGEN</span></div>'">`;
+      return `<img src="${p.url}" alt="${p.label || 'Pictograma'}" onerror="this.outerHTML='<div class=\\\'sin-imagen-box\\\' title=\\\'Sin pictograma\\\'><svg viewBox=\\\'0 0 48 48\\\' fill=\\\'none\\\' xmlns=\\\'http://www.w3.org/2000/svg\\\'><path d=\\\'M24 5 L43 24 L24 43 L5 24 Z\\\' stroke=\\\'#cbd5e1\\\' stroke-width=\\\'1.5\\\' stroke-dasharray=\\\'3 3\\\' fill=\\\'#f8fafc\\\'/><circle cx=\\\'24\\\' cy=\\\'24\\\' r=\\\'2\\\' fill=\\\'#94a3b8\\\'/></svg></div>'">`;
     }
-    return `<div class="sin-imagen-box"><span>SIN</span><span>IMAGEN</span></div>`;
+    return emptyPictoBox;
   }
 
   return `

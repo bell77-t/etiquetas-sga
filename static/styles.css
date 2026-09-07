@@ -1,33 +1,38 @@
 /* =========================================================
    SGA Label Studio - Réplica Exacta Plantilla Física Excel (A2:F12)
    Optimizado para Fichas Bibliográficas / Stickers y Fotocopias
+   Estilos Visuales Modernos SaaS y Efecto Papel Físico
    ========================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
-  background-color: #f8fafc;
-  color: #000000;
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  background-color: #f1f5f9;
+  color: #0f172a;
   margin: 0;
   padding: 0;
 }
 
-/* Scrollbar para interfaz */
+/* Scrollbar moderna y discreta */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* =========================================================
    ESTRUCTURA DE ETIQUETA IDÉNTICA A EXCEL (A2:F12)
+   Efecto de Papel Físico sobre Área de Trabajo
    ========================================================= */
 .etiqueta-card {
   width: 100%;
@@ -38,7 +43,11 @@ body {
   page-break-inside: avoid;
   break-inside: avoid;
   font-family: Arial, Helvetica, sans-serif;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  /* Sombra profunda y elegante estilo hoja de papel reposando */
+  box-shadow: 0 20px 25px -5px rgba(148, 163, 184, 0.4), 0 8px 10px -6px rgba(148, 163, 184, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
 }
 
 .etiqueta-excel-table {
@@ -139,24 +148,21 @@ body {
   margin: 0 auto;
 }
 
-/* Contenedor estándar SIN IMAGEN */
+/* Placeholder Minimalista Estilizado para Pictograma Vacío (Rombo punteado suave) */
 .sin-imagen-box {
   width: 52px;
   height: 52px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  background-color: #f8fafc;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 8.5px;
-  font-weight: bold;
-  color: #94a3b8;
-  line-height: 1.1;
   margin: 0 auto;
-  text-align: center;
   box-sizing: border-box;
+}
+
+.sin-imagen-box svg {
+  width: 44px;
+  height: 44px;
+  display: block;
 }
 
 /* Bloque Inferior: Frases H y P (Excel A9:F12) */
@@ -227,8 +233,8 @@ body {
   }
 
   .sin-imagen-box {
-    border: 1px solid #94a3b8 !important;
-    color: #64748b !important;
+    border: none !important;
+    background: transparent !important;
   }
 
   /* 1. MODO COLUMNA CONTINUA (SEGUIDAS COMO EN EXCEL / FOTOCOPIAS) */
@@ -243,6 +249,7 @@ body {
     width: 125mm !important;
     max-width: 125mm !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
     box-sizing: border-box !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -263,6 +270,7 @@ body {
     width: 95mm !important;
     max-width: 95mm !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
     box-sizing: border-box !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -276,6 +284,7 @@ body {
     width: 100% !important;
     max-width: 100mm !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
     box-sizing: border-box !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -293,6 +302,7 @@ body {
     width: 130mm !important;
     max-width: 130mm !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
