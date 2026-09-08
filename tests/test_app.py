@@ -1,11 +1,21 @@
 import unittest
 from pathlib import Path
-from data_loader import DataManager, generate_tank_labels
+from backend.data_loader import DataManager, generate_tank_labels
+from backend import audit_logger
 
 class TestSGABusinessRules(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._audit_db_path = audit_logger.DB_PATH
+        cls._test_audit_db = Path("var") / "test_audit.db"
+        cls._test_audit_db.unlink(missing_ok=True)
+        audit_logger.DB_PATH = cls._test_audit_db
         cls.dm = DataManager()
+
+    @classmethod
+    def tearDownClass(cls):
+        audit_logger.DB_PATH = cls._audit_db_path
+        cls._test_audit_db.unlink(missing_ok=True)
 
     def test_summary_and_catalog(self):
         summary = self.dm.get_summary()
@@ -128,8 +138,22 @@ class TestSGABusinessRules(unittest.TestCase):
         client.post("/api/set-program", json={"program": "Data"})
         print("[TEST PASS] Endpoints FastAPI para cambio de programa validados con TestClient.")
 
+    def test_program_requests_do_not_mutate_shared_state(self):
+        from fastapi.testclient import TestClient
+        from app import app, data_manager
+        client = TestClient(app)
+        data_manager.set_active_program("Data")
+
+        response = client.get("/api/applications?program=ALZ")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 124)
+        self.assertEqual(data_manager.current_program, "Data")
+
+        invalid_copies = client.post("/api/export-pdf", json={"copies": 501})
+        self.assertEqual(invalid_copies.status_code, 422)
+
     def test_ghs_inference(self):
-        from ghs_engine import infer_ghs_pictograms
+        from backend.ghs_engine import infer_ghs_pictograms
         # H318 & H410
         res = infer_ghs_pictograms("H318 Provoca lesiones oculares graves. H410 Muy tóxico para organismos acuáticos.")
         codes = [p["code"] for p in res]
@@ -138,7 +162,6 @@ class TestSGABusinessRules(unittest.TestCase):
         print(f"[TEST PASS] Inferencia GHS verificada: H318->GHS05, H410->GHS09: {codes}")
 
     def test_audit_logger(self):
-        import audit_logger
         log_id = audit_logger.log_event(
             operario="Inspector Test",
             accion="IMPRESION_TEST",
@@ -153,9 +176,9 @@ class TestSGABusinessRules(unittest.TestCase):
         print("[TEST PASS] Registro y trazabilidad en SQLite verificado.")
 
     def test_pdf_generation(self):
-        import pdf_generator
+        from backend import pdf_generator
         labels = self.dm.applications[0]["etiquetas"][:2]
-        picto_dir = self.dm.data_dir / "Picto"
+        picto_dir = self.dm.picto_dir
         buf = pdf_generator.generate_pdf(labels, picto_dir, layout="letter")
         self.assertGreater(len(buf.getvalue()), 1000)
         buf_th = pdf_generator.generate_pdf(labels, picto_dir, layout="thermal")

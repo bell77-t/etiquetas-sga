@@ -4,9 +4,12 @@ Permite modificar pictogramas, frases H/P, advertencia y unidad de medida desde 
 """
 
 import shutil
+import threading
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import openpyxl
+
+_EXCEL_WRITE_LOCK = threading.RLock()
 
 def update_product_in_excel(base_path: Path, update_data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -24,12 +27,14 @@ def update_product_in_excel(base_path: Path, update_data: Dict[str, Any]) -> Dic
     if not base_path.exists():
         raise FileNotFoundError(f"No se encontró el archivo base: {base_path}")
 
+    with _EXCEL_WRITE_LOCK:
+        return _update_product_in_excel_locked(base_path, update_data)
+
+
+def _update_product_in_excel_locked(base_path: Path, update_data: Dict[str, Any]) -> Dict[str, Any]:
     # 1. Crear copia de seguridad antes de modificar
     backup_path = base_path.with_suffix(".xlsx.bak")
-    try:
-        shutil.copy2(base_path, backup_path)
-    except Exception as e:
-        print(f"[WARN] No se pudo crear respaldo: {e}")
+    shutil.copy2(base_path, backup_path)
 
     # 2. Cargar libro con openpyxl (preservando formato)
     wb = openpyxl.load_workbook(base_path, data_only=False)

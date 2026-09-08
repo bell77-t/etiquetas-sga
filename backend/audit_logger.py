@@ -8,12 +8,16 @@ import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-DB_PATH = Path(__file__).resolve().parent / "audit.db"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = PROJECT_ROOT / "var" / "audit.db"
 
 def init_db():
     """Inicializa la base de datos de auditoría si no existe."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS audit_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,6 +37,9 @@ def init_db():
             detalles TEXT
         )
     """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_operario ON audit_logs(operario)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_producto ON audit_logs(producto)")
     conn.commit()
     conn.close()
 

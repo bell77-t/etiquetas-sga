@@ -3,40 +3,23 @@ import io
 import re
 import socket
 import urllib.parse
+from html import escape
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response, HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uvicorn
 import qrcode
 
-from data_loader import DataManager
-import excel_writer
-import audit_logger
-import pdf_generator
+from backend.data_loader import DataManager
+from backend import audit_logger, excel_writer, pdf_generator
 
 app = FastAPI(title="Visor y Generador de Etiquetas Fitosanitarias SGA", version="2.0.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 data_manager = DataManager()
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-
-# Localizar directorio Picto
-PICTO_DIR = data_manager.data_dir / "Picto"
-if not PICTO_DIR.exists():
-    PICTO_DIR = Path(__file__).resolve().parent / "Picto"
-if not PICTO_DIR.exists():
-    PICTO_DIR = Path(r"C:\Users\alexc\Downloads\Alejandra\Alejandra\Picto")
 
 
 def get_local_ip() -> str:
@@ -53,35 +36,36 @@ def get_local_ip() -> str:
 
 
 class SetDirectoryRequest(BaseModel):
-    directory: str
+    directory: str = Field(min_length=1, max_length=1024)
 
 
 class SetProgramRequest(BaseModel):
-    program: str
+    program: str = Field(min_length=1, max_length=32)
 
 
 class ProductUpdateRequest(BaseModel):
-    nombre: str
-    codigo: Optional[str] = None
-    palabra_advertencia: Optional[str] = None
-    frase_h: Optional[str] = None
-    frase_p: Optional[str] = None
-    um: Optional[str] = None
-    pictogramas: List[str] = []
-    operario: Optional[str] = "Usuario Web"
+    nombre: str = Field(min_length=1, max_length=200)
+    codigo: Optional[str] = Field(default=None, max_length=100)
+    palabra_advertencia: Optional[str] = Field(default=None, max_length=50)
+    frase_h: Optional[str] = Field(default=None, max_length=5000)
+    frase_p: Optional[str] = Field(default=None, max_length=5000)
+    um: Optional[str] = Field(default=None, max_length=30)
+    pictogramas: List[str] = Field(default_factory=list, max_length=4)
+    operario: Optional[str] = Field(default="Usuario Web", max_length=100)
 
 
 class ExportPdfRequest(BaseModel):
-    application_ids: List[str] = []
-    tanks_mode: Optional[str] = "all"
-    copies: int = 1
-    layout: str = "letter"
-    operario: Optional[str] = "Operario de Mezclas"
+    application_ids: List[str] = Field(default_factory=list, max_length=500)
+    program: Optional[str] = Field(default=None, max_length=32)
+    tanks_mode: Optional[str] = Field(default="all", max_length=10)
+    copies: int = Field(default=1, ge=1, le=500)
+    layout: Literal["letter", "thermal"] = "letter"
+    operario: Optional[str] = Field(default="Operario de Mezclas", max_length=100)
 
 
 class AuditLogRequest(BaseModel):
-    operario: str
-    accion: str
+    operario: str = Field(min_length=1, max_length=100)
+    accion: str = Field(min_length=1, max_length=100)
     programa: Optional[str] = None
     cultivo: Optional[str] = None
     sector_bloque: Optional[str] = None
@@ -91,14 +75,17 @@ class AuditLogRequest(BaseModel):
     volumen_tanque: Optional[float] = None
     numero_tanque: Optional[int] = None
     total_tanques: Optional[int] = None
-    copias: int = 1
-    detalles: Optional[str] = None
+    copias: int = Field(default=1, ge=1, le=500)
+    detalles: Optional[str] = Field(default=None, max_length=5000)
 
 
 @app.get("/api/summary")
-def get_summary():
+def get_summary(program: Optional[str] = Query(None, max_length=32)):
     """Obtiene resumen de datos cargados, fechas disponibles y productos."""
-    return data_manager.get_summary()
+    try:
+        return data_manager.get_summary(program)
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Programa no válido.")
 
 
 @app.post("/api/set-program")
@@ -109,12 +96,12 @@ def set_program(req: SetProgramRequest):
             status_code=400, 
             detail=f"Programa '{req.program}' no válido. Disponibles: {list(data_manager.programs.keys())}"
         )
-    data_manager.set_active_program(req.program)
+    program_data = data_manager.get_program_data(req.program)
     return {
         "success": True,
-        "current_program": data_manager.current_program,
-        "summary": data_manager.get_summary(),
-        "applications": data_manager.applications
+        "current_program": req.program,
+        "summary": data_manager.get_summary(req.program),
+        "applications": program_data["applications"]
     }
 
 
@@ -128,17 +115,20 @@ def reload_data():
             "message": "Datos actualizados exitosamente desde Excel",
             "summary": data_manager.get_summary()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al recargar datos: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="No fue posible recargar los datos. Revise los archivos de entrada.")
 
 
 @app.post("/api/set-directory")
 def set_directory(req: SetDirectoryRequest):
     """Permite cambiar la carpeta de origen de los archivos Excel."""
-    p = Path(req.directory)
+    p = Path(req.directory).resolve()
     if not p.exists() or not p.is_dir():
         raise HTTPException(status_code=400, detail="El directorio especificado no existe.")
+    if not (p / "aplicacion.xlsm").is_file():
+        raise HTTPException(status_code=400, detail="El directorio debe contener aplicacion.xlsm.")
     
+    previous_directory = data_manager.data_dir
     try:
         data_manager.data_dir = p
         data_manager.load_all()
@@ -147,8 +137,10 @@ def set_directory(req: SetDirectoryRequest):
             "message": f"Directorio actualizado a: {p}",
             "summary": data_manager.get_summary()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al leer desde el nuevo directorio: {str(e)}")
+    except Exception:
+        data_manager.data_dir = previous_directory
+        data_manager.load_all()
+        raise HTTPException(status_code=500, detail="No fue posible leer el directorio indicado.")
 
 
 @app.get("/api/applications")
@@ -159,10 +151,10 @@ def get_applications(
     search: Optional[str] = Query(None, description="Búsqueda de texto libre"),
 ):
     """Devuelve las aplicaciones fitosanitarias filtradas con sus etiquetas generadas."""
-    if program and program in data_manager.programs:
-        data_manager.set_active_program(program)
-
-    results = data_manager.applications
+    try:
+        results = data_manager.get_program_data(program)["applications"]
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Programa no válido.")
 
     if fecha:
         results = [a for a in results if a["fecha"]["iso"] == fecha]
@@ -195,14 +187,14 @@ def get_labels(
     producto: Optional[str] = Query(None, description="Filtrar por nombre de producto"),
     app_id: Optional[str] = Query(None, description="Filtrar por ID de aplicación específica"),
     search: Optional[str] = Query(None, description="Búsqueda de texto"),
-    limit: Optional[int] = Query(None, description="Límite de etiquetas para paginación"),
+    limit: Optional[int] = Query(None, ge=1, le=1000, description="Límite de etiquetas para paginación"),
     offset: int = Query(0, description="Offset de inicio"),
 ):
     """Devuelve la lista plana de etiquetas desglosadas por tanque para vista previa o impresión."""
-    if program and program in data_manager.programs:
-        data_manager.set_active_program(program)
-
-    apps = data_manager.applications
+    try:
+        apps = data_manager.get_program_data(program)["applications"]
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Programa no válido.")
 
     if app_id:
         apps = [a for a in apps if a["id"] == app_id]
@@ -242,25 +234,30 @@ def find_pictogram_file(filename: str) -> Optional[Path]:
     """Busca el archivo de pictograma en las rutas de Picto."""
     unquoted = urllib.parse.unquote(filename).strip()
     
-    candidate_dirs = [
-        data_manager.data_dir / "Picto",
-        Path(__file__).resolve().parent / "static" / "picto",
-        Path(__file__).resolve().parent / "Picto",
-        Path(r"C:\Users\alexc\Downloads\Alejandra\Alejandra\Picto"),
-    ]
+    candidate_dirs = [data_manager.picto_dir, STATIC_DIR / "picto"]
 
     for pdir in candidate_dirs:
         if not pdir.exists():
             continue
+
+        resolved_dir = pdir.resolve()
+
+        def is_file_inside_pictogram_dir(candidate: Path) -> bool:
+            """Evita que un parámetro de ruta acceda a archivos fuera de ``pdir``."""
+            try:
+                candidate.resolve().relative_to(resolved_dir)
+                return candidate.is_file()
+            except (ValueError, OSError):
+                return False
         
         # 1. Coincidencia directa
         exact_path = pdir / unquoted
-        if exact_path.exists() and exact_path.is_file():
+        if is_file_inside_pictogram_dir(exact_path):
             return exact_path
         
         if not unquoted.lower().endswith(".jpg"):
             with_ext = pdir / f"{unquoted}.jpg"
-            if with_ext.exists() and with_ext.is_file():
+            if is_file_inside_pictogram_dir(with_ext):
                 return with_ext
 
         # 2. Código GHS (ej: GHS01 a GHS09)
@@ -302,7 +299,7 @@ def get_pictogram_image(filename: str):
 @app.post("/api/products/update")
 def update_product(req: ProductUpdateRequest):
     """Permite editar y asignar pictogramas, frases H/P o advertencia guardando en Base_Actualizada.xlsx."""
-    base_file = data_manager.data_dir / data_manager.base_filename
+    base_file = data_manager.base_path
     if not base_file.exists():
         # Fallback a Base.xlsx
         base_file = data_manager.data_dir / "Base.xlsx"
@@ -330,14 +327,20 @@ def update_product(req: ProductUpdateRequest):
             "message": res["message"],
             "summary": data_manager.get_summary()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al actualizar Excel: {str(e)}")
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=500, detail="No fue posible actualizar el catálogo.")
 
 
 @app.post("/api/export-pdf")
 def export_pdf(req: ExportPdfRequest):
     """Genera archivo PDF vectorial multietiqueta (Carta o Rollo Térmico 100x150 mm) con ReportLab."""
-    apps = data_manager.applications
+    try:
+        selected_program = req.program or data_manager.current_program
+        apps = data_manager.get_program_data(selected_program)["applications"]
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Programa no válido.")
     if req.application_ids:
         id_set = set(req.application_ids)
         apps = [a for a in apps if a["id"] in id_set]
@@ -368,7 +371,7 @@ def export_pdf(req: ExportPdfRequest):
         audit_logger.log_event(
             operario=req.operario or "Operario de Mezclas",
             accion="DESCARGA_PDF",
-            programa=data_manager.current_program,
+            programa=selected_program,
             cultivo=a.get("cultivo"),
             sector_bloque=a.get("sector_bloque"),
             producto=a.get("producto"),
@@ -382,18 +385,18 @@ def export_pdf(req: ExportPdfRequest):
     try:
         pdf_buf = pdf_generator.generate_pdf(
             all_labels,
-            PICTO_DIR,
+            data_manager.picto_dir,
             qr_base_url=qr_base_url,
             layout=req.layout
         )
-        filename = f"etiquetas_{data_manager.current_program}_{req.layout}.pdf"
+        filename = f"etiquetas_{selected_program}_{req.layout}.pdf"
         return Response(
             content=pdf_buf.getvalue(),
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al generar PDF: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="No fue posible generar el PDF.")
 
 
 @app.get("/api/audit/logs")
@@ -509,22 +512,24 @@ def get_ficha_seguridad(code_or_name: str):
             "pictogramas": []
         }
 
-    nombre = prod["nombre"]
-    codigo = prod.get("codigo", "N/A")
-    adv = prod.get("palabra_advertencia", "PELIGRO").upper()
+    nombre = escape(str(prod["nombre"]))
+    codigo = escape(str(prod.get("codigo", "N/A")))
+    adv = escape(str(prod.get("palabra_advertencia", "PELIGRO")).upper())
     is_danger = adv == "PELIGRO"
     pictos = [p for p in prod.get("pictogramas", []) if p.get("has_image")]
-    frase_h = prod.get("frase_h", "Sin frases H.")
-    frase_p = prod.get("frase_p", "Sin frases P.")
+    frase_h = escape(str(prod.get("frase_h", "Sin frases H.")))
+    frase_p = escape(str(prod.get("frase_p", "Sin frases P.")))
 
     pictos_html = ""
     for p in pictos:
-        url = p.get("url") or f"/picto/{p.get('filename')}"
+        url = escape(str(p.get("url") or f"/picto/{urllib.parse.quote(str(p.get('filename', '')))}"), quote=True)
+        code = escape(str(p.get("code", "")))
+        label = escape(str(p.get("label") or p.get("name") or ""))
         pictos_html += f"""
         <div class="flex flex-col items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-            <img src="{url}" alt="{p.get('code')}" class="w-16 h-16 object-contain mb-1">
-            <span class="text-xs font-bold text-slate-800">{p.get('code')}</span>
-            <span class="text-[10px] text-slate-500 text-center">{p.get('label') or p.get('name') or ''}</span>
+            <img src="{url}" alt="{code}" class="w-16 h-16 object-contain mb-1">
+            <span class="text-xs font-bold text-slate-800">{code}</span>
+            <span class="text-[10px] text-slate-500 text-center">{label}</span>
         </div>
         """
 
@@ -643,8 +648,8 @@ def get_manifest():
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-if PICTO_DIR.exists():
-    app.mount("/picto_static", StaticFiles(directory=str(PICTO_DIR)), name="picto_static")
+if data_manager.picto_dir.exists():
+    app.mount("/picto_static", StaticFiles(directory=str(data_manager.picto_dir)), name="picto_static")
 
 
 @app.get("/")

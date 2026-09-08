@@ -6,34 +6,34 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import openpyxl
 
-from ghs_engine import infer_ghs_pictograms
+from .ghs_engine import infer_ghs_pictograms
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BUNDLED_CATALOG_DIR = PROJECT_ROOT / "data" / "catalog"
+BUNDLED_PICTOGRAM_DIR = PROJECT_ROOT / "static" / "picto"
 
 DEFAULT_SEARCH_PATHS = [
-    Path(r"C:\Users\alexc\Downloads\Alejandra\Alejandra"),
-    Path(__file__).resolve().parent,
-    Path(__file__).resolve().parent.parent,
+    Path(os.environ["SGA_DATA_DIR"]) if os.environ.get("SGA_DATA_DIR") else PROJECT_ROOT,
+    PROJECT_ROOT,
     Path.cwd(),
+    # Compatibilidad temporal con la instalación original. Use SGA_DATA_DIR en instalaciones nuevas.
+    Path(r"C:\Users\alexc\Downloads\Alejandra\Alejandra"),
 ]
 
 def find_data_directory(custom_path: Optional[str] = None) -> Path:
-    """Busca el directorio que contiene los archivos aplicacion.xlsm, Base_Actualizada.xlsx / Base.xlsx y Picto."""
+    """Busca el directorio que contiene ``aplicacion.xlsm`` (o usa SGA_DATA_DIR)."""
     if custom_path and os.path.exists(custom_path):
         p = Path(custom_path)
-        if (p / "aplicacion.xlsm").exists() or (p / "Base_Actualizada.xlsx").exists() or (p / "Base.xlsx").exists():
+        if (p / "aplicacion.xlsm").exists():
             return p
 
     for path in DEFAULT_SEARCH_PATHS:
         if path.exists():
             has_app = (path / "aplicacion.xlsm").exists()
-            has_base = (path / "Base_Actualizada.xlsx").exists() or (path / "Base.xlsx").exists()
-            if has_app and has_base:
+            if has_app:
                 return path
 
-    for path in DEFAULT_SEARCH_PATHS:
-        if path.exists() and (path / "aplicacion.xlsm").exists():
-            return path
-
-    return Path(r"C:\Users\alexc\Downloads\Alejandra\Alejandra")
+    return PROJECT_ROOT
 
 
 def read_file_bytes_non_blocking(filepath: Path) -> io.BytesIO:
@@ -536,9 +536,9 @@ class DataManager:
         self.load_all()
 
     def load_all(self):
-        picto_dir = self.data_dir / "Picto"
-        if not picto_dir.exists():
-            picto_dir = Path(__file__).resolve().parent / "Picto"
+        self.picto_dir = self.data_dir / "Picto"
+        if not self.picto_dir.exists():
+            self.picto_dir = BUNDLED_PICTOGRAM_DIR
 
         # Buscar archivo maestro de productos priorizando Base_Actualizada.xlsx
         base_candidates = [
@@ -548,6 +548,8 @@ class DataManager:
             self.data_dir / "base_actualizada.xlsx",
             self.data_dir / "Base.xlsx",
             self.data_dir / "base.xlsx",
+            BUNDLED_CATALOG_DIR / "Base_Actualizada.xlsx",
+            BUNDLED_CATALOG_DIR / "Base.xlsx",
         ]
         base_path = None
         for cand in base_candidates:
@@ -569,7 +571,8 @@ class DataManager:
             raise FileNotFoundError(f"No se encontró aplicacion.xlsm en {self.data_dir}")
 
         self.base_filename = base_path.name
-        self.base_catalog = load_base_catalog(base_path, picto_dir)
+        self.base_path = base_path
+        self.base_catalog = load_base_catalog(base_path, self.picto_dir)
 
         # Extraer lista única de los 228 productos maestros desde Base_Actualizada.xlsx (Columna B: Nombre del Producto)
         seen_master_names = set()
@@ -635,9 +638,26 @@ class DataManager:
         self.available_dates = sorted(dates_list, key=lambda x: x["iso"], reverse=True)
         self.available_products = sorted(list(products_seen))
 
-    def get_summary(self) -> Dict[str, Any]:
-        total_apps = len(self.applications)
-        total_labels = sum(len(a["etiquetas"]) for a in self.applications)
+    def get_program_data(self, program_id: Optional[str] = None) -> Dict[str, Any]:
+        """Obtiene datos de un programa sin cambiar el estado compartido del servidor."""
+        selected_id = program_id or self.current_program
+        if selected_id not in self.programs:
+            raise KeyError(selected_id)
+        applications = self.programs[selected_id]["applications"]
+        dates = {item["fecha"]["iso"]: item["fecha"] for item in applications if item["fecha"]["iso"]}
+        products = sorted({item["producto"] for item in applications if item["producto"]})
+        return {
+            "program_id": selected_id,
+            "applications": applications,
+            "available_dates": sorted(dates.values(), key=lambda item: item["iso"], reverse=True),
+            "available_products": products,
+        }
+
+    def get_summary(self, program_id: Optional[str] = None) -> Dict[str, Any]:
+        program_data = self.get_program_data(program_id)
+        applications = program_data["applications"]
+        total_apps = len(applications)
+        total_labels = sum(len(a["etiquetas"]) for a in applications)
         programs_summary = [
             {
                 "id": p["id"],
@@ -652,13 +672,13 @@ class DataManager:
             "data_directory": str(self.data_dir),
             "base_file": getattr(self, "base_filename", "Base_Actualizada.xlsx"),
             "last_loaded": self.last_loaded.strftime("%Y-%m-%d %H:%M:%S") if self.last_loaded else None,
-            "current_program": self.current_program,
+            "current_program": program_data["program_id"],
             "available_programs": programs_summary,
             "total_applications": total_apps,
             "total_labels": total_labels,
             "total_products_in_catalog": len(self.master_products),
             "master_products": [p["nombre"] for p in self.master_products],
             "master_products_data": self.master_products,
-            "available_dates": self.available_dates,
-            "available_products": self.available_products,
+            "available_dates": program_data["available_dates"],
+            "available_products": program_data["available_products"],
         }

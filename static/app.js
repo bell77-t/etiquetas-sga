@@ -282,6 +282,14 @@ function setupEventListeners() {
     if (state.summary) {
       dom.inputDirPath.value = state.summary.data_directory;
     }
+    const savedLayout = localStorage.getItem("sga_print_layout");
+    if (savedLayout && dom.selectPrintLayout) {
+      dom.selectPrintLayout.value = savedLayout;
+    }
+    const savedTanks = localStorage.getItem("sga_tanks_mode");
+    if (savedTanks && dom.selectTanksMode) {
+      dom.selectTanksMode.value = savedTanks;
+    }
     dom.modalConfig.classList.remove("hidden");
   });
 
@@ -290,7 +298,20 @@ function setupEventListeners() {
 
   dom.btnSaveDir.addEventListener("click", async () => {
     const newPath = dom.inputDirPath.value.trim();
-    if (!newPath) return;
+    if (dom.selectPrintLayout) {
+      localStorage.setItem("sga_print_layout", dom.selectPrintLayout.value);
+    }
+    if (dom.selectTanksMode) {
+      localStorage.setItem("sga_tanks_mode", dom.selectTanksMode.value);
+      updateSelectionUI();
+    }
+
+    if (!newPath) {
+      dom.modalConfig.classList.add("hidden");
+      showToast("Preferencias de visualización e impresión actualizadas", "success");
+      return;
+    }
+
     try {
       const res = await fetch("/api/set-directory", {
         method: "POST",
@@ -300,7 +321,7 @@ function setupEventListeners() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Error al actualizar directorio");
       dom.modalConfig.classList.add("hidden");
-      showToast("Directorio actualizado y datos recargados", "success");
+      showToast("Directorio y preferencias guardados exitosamente", "success");
       loadData();
     } catch (err) {
       showToast(err.message, "error");
@@ -346,11 +367,28 @@ function setupAdvancedFeatures() {
   if (dom.btnCopyIp) {
     dom.btnCopyIp.addEventListener("click", () => {
       if (dom.networkIpUrl) {
-        navigator.clipboard.writeText(dom.networkIpUrl.textContent).then(() => {
-          showToast("Enlace de red copiado al portapapeles", "success");
-        });
+        const text = dom.networkIpUrl.textContent.trim();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            showToast("¡Enlace de red copiado al portapapeles!", "success");
+          }).catch(() => {
+            fallbackCopy(text);
+          });
+        } else {
+          fallbackCopy(text);
+        }
       }
     });
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    showToast("¡Enlace de red copiado al portapapeles!", "success");
   }
 
   // 2. Auditoría ICA / GlobalGAP
@@ -370,7 +408,13 @@ function setupAdvancedFeatures() {
   }
 
   if (dom.btnRefreshAudit) {
-    dom.btnRefreshAudit.addEventListener("click", () => loadAuditLogs(dom.inputAuditSearch ? dom.inputAuditSearch.value : ""));
+    dom.btnRefreshAudit.addEventListener("click", async () => {
+      const icon = dom.btnRefreshAudit.querySelector("i");
+      if (icon) icon.classList.add("animate-spin");
+      await loadAuditLogs(dom.inputAuditSearch ? dom.inputAuditSearch.value : "");
+      if (icon) icon.classList.remove("animate-spin");
+      showToast("Historial de auditoría ICA actualizado", "info");
+    });
   }
 
   if (dom.inputAuditSearch) {
@@ -408,7 +452,12 @@ function setupAdvancedFeatures() {
       e.preventDefault();
       const checkedPictos = Array.from(dom.pictoSelectorGrid.querySelectorAll("input:checked")).map(el => el.value);
       const submitBtn = dom.formEditProduct.querySelector("button[type='submit']");
-      submitBtn.disabled = true;
+      const origBtnText = submitBtn ? submitBtn.innerHTML : "";
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i><span>Guardando en Excel...</span>`;
+        lucide.createIcons();
+      }
 
       try {
         const payload = {
@@ -431,14 +480,25 @@ function setupAdvancedFeatures() {
         if (!res.ok) throw new Error(data.detail || "Error al guardar en Excel");
 
         dom.modalEditProduct.classList.add("hidden");
-        showToast("¡Ficha SGA actualizada y guardada en Excel!", "success");
+        showToast(`¡Ficha de ${payload.nombre} guardada y actualizada en Excel!`, "success");
         await loadData();
       } catch (err) {
         showToast("Error al guardar: " + err.message, "error");
       } finally {
-        submitBtn.disabled = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origBtnText;
+          lucide.createIcons();
+        }
       }
     });
+
+    const btnSaveEdit = document.getElementById("btn-save-edit");
+    if (btnSaveEdit) {
+      btnSaveEdit.addEventListener("click", () => {
+        dom.formEditProduct.requestSubmit();
+      });
+    }
   }
 
   // 4. Exportación PDF Vectorial
@@ -456,6 +516,27 @@ function setupAdvancedFeatures() {
   }
   if (dom.btnConfirmPdfExport) {
     dom.btnConfirmPdfExport.addEventListener("click", () => executePdfExport());
+  }
+
+  // Interacción visual en radios de formato PDF
+  if (dom.modalPdf) {
+    const pdfRadios = dom.modalPdf.querySelectorAll('input[name="pdf-layout"]');
+    pdfRadios.forEach(radio => {
+      radio.addEventListener("change", () => {
+        pdfRadios.forEach(r => {
+          const lbl = r.closest("label");
+          if (lbl) {
+            if (r.checked) {
+              lbl.classList.add("border-emerald-500", "bg-emerald-50/50", "ring-2", "ring-emerald-500/20");
+              lbl.classList.remove("border-slate-200");
+            } else {
+              lbl.classList.remove("border-emerald-500", "bg-emerald-50/50", "ring-2", "ring-emerald-500/20");
+              lbl.classList.add("border-slate-200");
+            }
+          }
+        });
+      });
+    });
   }
 }
 
@@ -631,6 +712,7 @@ async function executePdfExport() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         application_ids: appIds,
+        program: state.currentProgram,
         tanks_mode: limitMode,
         copies: copies,
         layout: layout,
@@ -1251,7 +1333,7 @@ function renderApplicationsList() {
               }
               ${(app.base_info && app.base_info.has_inferred_pictos) ? `<span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-blue-200 shadow-2xs" title="Pictogramas sugeridos automáticamente a partir de las frases H">🤖 Sugerido GHS</span>` : ''}
             </div>
-            <button class="text-emerald-600 hover:text-emerald-700 font-semibold text-xs flex items-center gap-1 transition-colors">
+            <button type="button" class="btn-ver-plantilla text-emerald-600 hover:text-emerald-700 font-semibold text-xs flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-emerald-50 active:scale-95" title="Ver y cargar plantilla Excel de este producto">
               <span>Ver Plantilla Excel</span>
               <i data-lucide="chevron-right" class="w-4 h-4"></i>
             </button>
@@ -1263,6 +1345,20 @@ function renderApplicationsList() {
     card.addEventListener("click", () => {
       setActiveApp(app, 0);
     });
+
+    const btnVer = card.querySelector(".btn-ver-plantilla");
+    if (btnVer) {
+      btnVer.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setActiveApp(app, 0);
+        if (dom.labelPreviewCard) {
+          dom.labelPreviewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          dom.labelPreviewCard.classList.add("ring-4", "ring-emerald-500/40");
+          setTimeout(() => dom.labelPreviewCard.classList.remove("ring-4", "ring-emerald-500/40"), 800);
+        }
+        showToast(`Mostrando plantilla oficial para: ${app.producto}`, "info");
+      });
+    }
 
     const chk = card.querySelector(".app-checkbox");
     chk.addEventListener("change", (e) => {
@@ -1353,6 +1449,9 @@ function setActiveApp(app, labelIndex = 0) {
  * Genera el HTML exacto de la plantilla física de Excel (A2:F12)
  */
 function generateExcelLabelHTML(label) {
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+  }[char]));
   const base = label.base_info || {};
   const pictos = base.pictogramas || [];
   const p1 = pictos[0] || { has_image: false };
@@ -1376,19 +1475,19 @@ function generateExcelLabelHTML(label) {
           <!-- Fila 1 (Excel A2:D2 y E2:F2): Nombre Producto | Palabra Advertencia -->
           <tr>
             <td colspan="4" class="cell-producto">
-              ${label.producto}
+              ${escapeHtml(label.producto)}
             </td>
             <td colspan="2" class="cell-advertencia">
-              ${base.palabra_advertencia || 'PELIGRO'}
+              ${escapeHtml(base.palabra_advertencia || 'PELIGRO')}
             </td>
           </tr>
 
           <!-- Fila 2 (Excel A3:D3 y E3, F3): BLOQUE | FECHA APLICACIÓN | PICTO 1 | PICTO 2 -->
           <tr>
             <td class="cell-lbl">BLOQUE</td>
-            <td class="cell-val"><strong>${label.sector_bloque}</strong></td>
+            <td class="cell-val"><strong>${escapeHtml(label.sector_bloque)}</strong></td>
             <td class="cell-lbl">FECHA APLICACIÓN</td>
-            <td class="cell-val"><strong>${label.fecha.display}</strong></td>
+            <td class="cell-val"><strong>${escapeHtml(label.fecha.display)}</strong></td>
             <td rowspan="3" class="cell-picto">
               ${renderPictoCell(p1)}
             </td>
@@ -1400,15 +1499,15 @@ function generateExcelLabelHTML(label) {
           <!-- Fila 3 (Excel A4:D4): REENTRADA | UNIDAD -->
           <tr>
             <td class="cell-lbl">REENTRADA</td>
-            <td class="cell-val"><strong>${label.reentrada || '0'}</strong></td>
+            <td class="cell-val"><strong>${escapeHtml(label.reentrada || '0')}</strong></td>
             <td class="cell-lbl">UNIDAD</td>
-            <td class="cell-val"><strong>${label.unidad}</strong></td>
+            <td class="cell-val"><strong>${escapeHtml(label.unidad)}</strong></td>
           </tr>
 
           <!-- Fila 4 (Excel A5:D5): CATEGORIA | CANTIDAD -->
           <tr>
             <td class="cell-lbl">CATEGORIA</td>
-            <td class="cell-val"><strong>${label.categoria || ''}</strong></td>
+            <td class="cell-val"><strong>${escapeHtml(label.categoria || '')}</strong></td>
             <td class="cell-lbl">CANTIDAD</td>
             <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar)}</strong></td>
           </tr>
@@ -1418,7 +1517,7 @@ function generateExcelLabelHTML(label) {
             <td class="cell-lbl-sub">VOL. TANQUE</td>
             <td class="cell-val-sub"><strong>${formatNumber(label.litros_tanque)} L</strong></td>
             <td class="cell-lbl-sub">ETIQUETA</td>
-            <td class="cell-val-sub"><strong>${label.tipo_tanque}</strong></td>
+            <td class="cell-val-sub"><strong>${escapeHtml(label.tipo_tanque)}</strong></td>
             <td rowspan="3" class="cell-picto">
               ${renderPictoCell(p3)}
             </td>
@@ -1448,7 +1547,7 @@ function generateExcelLabelHTML(label) {
 
           <!-- FRASE H Texto Completo Visible (Excel A10:F10) -->
           <tr>
-            <td colspan="6" class="cell-frase-content">${base.frase_h || 'No clasificado como peligroso / Sin frases H.'}</td>
+            <td colspan="6" class="cell-frase-content">${escapeHtml(base.frase_h || 'No clasificado como peligroso / Sin frases H.')}</td>
           </tr>
 
           <!-- FRASE P Encabezado (Excel A11:F11) -->
@@ -1458,7 +1557,7 @@ function generateExcelLabelHTML(label) {
 
           <!-- FRASE P Texto Completo Visible (Excel A12:F12) -->
           <tr>
-            <td colspan="6" class="cell-frase-content">${base.frase_p || 'P102 Manténgase fuera del alcance de los niños.\nP270 No comer, beber ni fumar durante su utilización.'}</td>
+            <td colspan="6" class="cell-frase-content">${escapeHtml(base.frase_p || 'P102 Manténgase fuera del alcance de los niños.\nP270 No comer, beber ni fumar durante su utilización.')}</td>
           </tr>
         </tbody>
       </table>
