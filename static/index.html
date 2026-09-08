@@ -39,63 +39,66 @@
   <div id="app-root" class="flex flex-col flex-1">
     
     <!-- Top Navbar -->
-    <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md border-b border-slate-800/90 backdrop-blur-md">
+    <header class="bg-slate-900/95 text-white sticky top-0 z-30 shadow-lg border-b border-slate-800 backdrop-blur-md">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
-        <!-- Logo / Titulo -->
-        <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+        <!-- Logo / Titulo con badge de cumplimiento normativo -->
+        <div class="flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/25 ring-1 ring-white/20">
             <i data-lucide="tag" class="w-5 h-5"></i>
           </div>
           <div>
-            <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              SGA Label Studio <span class="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">v2.3</span>
-            </h1>
-            <p class="text-xs text-slate-400 font-medium">Visor y Generador de Mezclas Fitosanitarias</p>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base font-extrabold tracking-tight text-white">
+                SGA Label Studio
+              </h1>
+              <span class="text-[10px] tracking-wide font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full shadow-2xs">v2.4 Enterprise</span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-medium flex items-center gap-1.5">
+              <span>Visor y Generador de Mezclas Fitosanitarias</span>
+              <span class="text-slate-600">&bull;</span>
+              <span class="text-emerald-400/90 font-mono text-[10px]">ICA &bull; GlobalGAP &bull; SGA</span>
+            </p>
           </div>
         </div>
 
-        <!-- Metricas de Cabecera (Barra moderna con píldoras translúcidas y bordes suaves) -->
-        <div class="hidden md:flex items-center space-x-2.5 text-xs text-slate-300">
-          <div class="flex items-center gap-2 bg-slate-800/70 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-slate-700/60 shadow-xs">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Excel: <strong id="lbl-excel-path" class="text-emerald-300 font-mono font-medium">Cargando...</strong></span>
-          </div>
-          <div class="flex items-center gap-1.5 bg-slate-800/50 backdrop-blur-sm px-2.5 py-1.5 rounded-lg border border-slate-700/50 shadow-xs">
-            <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span>Fechas: <strong id="metric-dates" class="text-white font-semibold">0</strong></span>
-          </div>
-          <div class="flex items-center gap-1.5 bg-slate-800/50 backdrop-blur-sm px-2.5 py-1.5 rounded-lg border border-slate-700/50 shadow-xs">
-            <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span>Lotes: <strong id="metric-apps" class="text-white font-semibold">0</strong></span>
-          </div>
-          <div class="flex items-center gap-1.5 bg-slate-800/50 backdrop-blur-sm px-2.5 py-1.5 rounded-lg border border-slate-700/50 shadow-xs">
-            <i data-lucide="printer" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span>Etiquetas: <strong id="metric-labels" class="text-white font-semibold">0</strong></span>
-          </div>
-        </div>
+        <!-- Acciones Principales (Limpias, funcionales y sin adornos redundantes) -->
+        <div class="flex items-center space-x-2">
+          <!-- Botón Móvil / Red Local -->
+          <button id="btn-network-info" class="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Conectar smartphone o tablet en red local (PWA)">
+            <i data-lucide="smartphone" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span class="hidden sm:inline">Móvil / Red</span>
+          </button>
 
-        <!-- Acciones Principales -->
-        <div class="flex items-center space-x-2.5">
-          <!-- Botón Recargar Excel con microinteracción hover/loading -->
-          <button id="btn-reload" class="group flex items-center gap-2 bg-slate-800 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 border border-slate-700 shadow-sm active:scale-[0.98]" title="Releer archivos Excel en caliente">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 transition-transform duration-500 ease-out group-hover:rotate-180"></i>
-            <span>Recargar Excel</span>
+          <!-- Botón Registro de Auditoría ICA -->
+          <button id="btn-open-audit" class="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Historial y Trazabilidad para certificaciones ICA / GlobalGAP">
+            <i data-lucide="clipboard-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span class="hidden sm:inline">Auditoría ICA</span>
+          </button>
+
+          <!-- Botón Recargar Excel en caliente -->
+          <button id="btn-reload" class="group flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Releer archivos Excel en caliente">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 transition-transform duration-500 ease-out group-hover:rotate-180 text-slate-300"></i>
+            <span class="hidden md:inline">Recargar</span>
           </button>
           
-          <button id="btn-config" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700/80" title="Configurar Directorio">
+          <!-- Botón Configurar Directorio -->
+          <button id="btn-config" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800/90 rounded-lg transition-colors border border-transparent hover:border-slate-700/80 active:scale-[0.98]" title="Configurar Directorio">
             <i data-lucide="folder-search" class="w-4 h-4"></i>
-          </button>
-
-          <!-- CTA Principal Imprimir con estado activo y brillo sutil -->
-          <button id="btn-print-selection" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 shadow-md shadow-emerald-600/20 active:scale-[0.98]">
-            <i data-lucide="printer" class="w-4 h-4"></i>
-            <span>Imprimir (<span id="selected-print-count">0</span>)</span>
           </button>
         </div>
 
       </div>
     </header>
+
+    <!-- Fallbacks ocultos para compatibilidad técnica de scripts -->
+    <div style="display:none;" aria-hidden="true">
+      <span id="lbl-excel-path"></span>
+      <span id="metric-catalog"></span>
+      <span id="metric-dates"></span>
+      <span id="metric-apps"></span>
+      <span id="metric-labels"></span>
+    </div>
 
     <!-- Main Content Layout -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -106,6 +109,22 @@
         <!-- Barra de Búsqueda y Filtros -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80 space-y-4">
           
+          <!-- Selector de Programa de Cultivo (Pestañas de Excel) -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
+                Programa de Cultivo (Pestañas Excel)
+              </label>
+              <span id="program-status-badge" class="text-[11px] font-semibold text-slate-400"></span>
+            </div>
+            <div id="program-tabs" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <!-- Se puebla dinamicamente -->
+            </div>
+          </div>
+
+          <hr class="border-slate-100">
+
           <!-- Filtro por Fecha (Chips Horizontales modernos) -->
           <div>
             <div class="flex items-center justify-between mb-2">
@@ -124,78 +143,57 @@
 
           <hr class="border-slate-100">
 
-          <!-- Buscador por Producto y Texto -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Canal de Búsqueda Inteligente y Filtro de Producto -->
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-emerald-600"></i>
+                Búsqueda Inteligente
+              </label>
+              <span class="text-[11px] text-slate-400 hidden sm:inline-flex items-center gap-1 font-mono">
+                <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] text-slate-500 font-semibold shadow-2xs">/</kbd> buscar &bull; <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] text-slate-500 font-semibold shadow-2xs">Esc</kbd> borrar
+              </span>
+            </div>
+
+            <!-- Barra de Búsqueda Rápida con Icono, Contador y Botón Limpiar -->
+            <div class="relative flex items-center">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+              <input type="text" id="input-search" placeholder="Buscar por producto, código, bloque, dosis, advertencia (ej: OX-VIRIN, 1DEOXV01, Bloque 4)..." class="w-full bg-slate-50/90 border border-slate-200 hover:border-slate-300 rounded-xl py-2.5 pl-10 pr-24 text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all shadow-2xs">
+              
+              <!-- Badge de resultados y botón Limpiar dentro del input -->
+              <div class="absolute right-2.5 flex items-center gap-1.5">
+                <span id="search-match-badge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">0</span>
+                <button id="btn-clear-search" type="button" class="hidden p-1 text-slate-400 hover:text-slate-600 rounded-md transition hover:bg-slate-200/60" title="Limpiar búsqueda (Esc)">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Filtro Rápido por Producto -->
             <div class="relative">
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Producto Fitosanitario</label>
-              <div class="relative">
-                <select id="select-product" class="w-full bg-slate-50/80 border border-slate-200 hover:border-slate-300 rounded-lg py-2 pl-3 pr-8 text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all truncate shadow-2xs">
-                  <option value="">Todos los Productos...</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Búsqueda rápida</label>
-              <div class="relative">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="input-search" placeholder="Sector, Bloque, Dosis..." class="w-full bg-slate-50/80 border border-slate-200 hover:border-slate-300 rounded-lg py-2 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all shadow-2xs">
-              </div>
-            </div>
-          </div>
-
-          <!-- Opciones de Impresión, Disposición y Cantidad de Copias -->
-          <div class="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3">
-            <div class="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <i data-lucide="settings-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>Opciones de Impresión para Fotocopias / Stickers</span>
-            </div>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <!-- Disposición de Página -->
-              <div>
-                <label class="block text-slate-600 font-medium mb-1">Disposición en Papel:</label>
-                <select id="select-print-layout" class="w-full bg-white border border-slate-200 rounded-lg py-2 px-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none shadow-2xs">
-                  <option value="continuous" selected>📜 1 Columna Continua (Como en Excel)</option>
-                  <option value="2columns">📑 2 Columnas (Ahorro / Fotocopia 4-6 por hoja)</option>
-                  <option value="1perpage">📄 1 Etiqueta por Hoja (Térmica / Rollo)</option>
-                  <option value="2perpage">📑 2 Etiquetas por Hoja (Media Carta)</option>
-                </select>
-              </div>
-
-              <!-- Límite de Tanques por Lote -->
-              <div>
-                <label class="block text-slate-600 font-medium mb-1">Tanques por Lote:</label>
-                <select id="select-tanks-mode" class="w-full bg-white border border-slate-200 rounded-lg py-2 px-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none shadow-2xs">
-                  <option value="all" selected>Todos los tanques</option>
-                  <option value="1">Solo 1 tanque representativo</option>
-                  <option value="2">Máx. 2 tanques</option>
-                  <option value="3">Máx. 3 tanques</option>
-                  <option value="5">Máx. 5 tanques</option>
-                  <option value="10">Máx. 10 tanques</option>
-                </select>
-              </div>
-
-              <!-- Copias por cada etiqueta (Selector Segmentado Estilizado) -->
-              <div>
-                <label class="block text-slate-600 font-medium mb-1">Copias de cada una:</label>
-                <div class="inline-flex items-center bg-white p-1 rounded-lg border border-slate-200 shadow-2xs w-full justify-between">
-                  <button id="btn-batch-copies-minus" type="button" class="w-7 h-7 bg-slate-100 hover:bg-slate-200/80 active:bg-slate-300 text-slate-700 font-bold rounded-md flex items-center justify-center text-xs transition border border-slate-200/60 shadow-2xs">−</button>
-                  <input type="number" id="input-batch-copies" value="1" min="1" max="500" class="w-12 bg-transparent text-center font-bold text-slate-900 text-xs focus:outline-none">
-                  <button id="btn-batch-copies-plus" type="button" class="w-7 h-7 bg-slate-100 hover:bg-slate-200/80 active:bg-slate-300 text-slate-700 font-bold rounded-md flex items-center justify-center text-xs transition border border-slate-200/60 shadow-2xs">+</button>
-                </div>
-              </div>
+              <select id="select-product" class="w-full bg-slate-50/80 border border-slate-200 hover:border-slate-300 rounded-lg py-1.5 pl-3 pr-8 text-xs font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all truncate shadow-2xs">
+                <option value="">Todos los Productos fitosanitarios...</option>
+              </select>
             </div>
           </div>
 
           <!-- Barra de selección y conteos -->
-          <div class="flex items-center justify-between pt-1 text-xs text-slate-500">
+          <div class="flex items-center justify-between pt-1 text-xs text-slate-500 flex-wrap gap-2">
             <div class="flex items-center gap-2">
               <input type="checkbox" id="check-select-all" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer transition">
-              <label for="check-select-all" class="cursor-pointer font-medium text-slate-700 select-none">Seleccionar todos los lotes filtrados</label>
+              <label for="check-select-all" class="cursor-pointer font-medium text-slate-700 select-none">Seleccionar todos</label>
             </div>
-            <div>
-              Mostrando <strong id="count-filtered-apps" class="text-slate-800 font-bold">0</strong> lotes (<strong id="count-filtered-labels" class="text-slate-800 font-bold">0</strong> tanques)
+            <div class="flex items-center gap-2">
+              <span>Mostrando <strong id="count-filtered-apps" class="text-slate-800 font-bold">0</strong> lotes (<strong id="count-filtered-labels" class="text-slate-800 font-bold">0</strong> tanques)</span>
+              <!-- Acciones contextuales de lote (solo aparecen cuando hay selección) -->
+              <button id="btn-print-selection" class="hidden items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition shadow-xs active:scale-[0.98]" title="Imprimir lotes seleccionados">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                <span>Imprimir (<span id="selected-print-count">0</span>)</span>
+              </button>
+              <button id="btn-pdf-batch" class="hidden items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded-lg text-xs font-semibold transition border border-slate-200 shadow-xs" title="Exportar seleccionados en PDF">
+                <i data-lucide="file-down" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>PDF</span>
+              </button>
             </div>
           </div>
         </div>
@@ -211,26 +209,39 @@
       <section class="lg:col-span-5 flex flex-col space-y-4">
         
         <!-- Contenedor del Preview -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80 sticky top-20 flex flex-col space-y-4">
+        <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 sticky top-20 flex flex-col space-y-4">
           
-          <div class="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
-            <div class="flex items-center gap-2">
-              <div class="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3.5 flex-wrap gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs border border-emerald-100">
                 <i data-lucide="eye" class="w-4 h-4"></i>
               </div>
-              <h2 class="font-bold text-slate-800 text-sm">Vista Previa SGA</h2>
+              <div>
+                <h2 class="font-bold text-slate-800 text-sm tracking-tight">Vista Previa SGA</h2>
+                <span class="text-[10px] text-slate-400 font-medium">Plantilla Oficial A2:F12</span>
+              </div>
             </div>
             
-            <!-- Selector de Copias para Vista Previa (Segmentado Estilizado) -->
-            <div class="flex items-center gap-2">
-              <div class="inline-flex items-center bg-slate-100/90 p-1 rounded-lg border border-slate-200 text-xs shadow-2xs">
-                <span class="text-slate-500 font-medium px-1.5 text-[11px]">Copias:</span>
-                <button id="btn-preview-copies-minus" type="button" class="w-6 h-6 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded-md flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs">−</button>
-                <input type="number" id="input-preview-copies" value="1" min="1" max="500" class="w-8 text-center bg-transparent font-bold text-slate-800 text-xs focus:outline-none">
-                <button id="btn-preview-copies-plus" type="button" class="w-6 h-6 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded-md flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs">+</button>
+            <!-- Selector de Copias para Vista Previa y Acciones Rápidas -->
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button id="btn-edit-product" class="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition border border-slate-200/90 shadow-2xs hover:shadow-xs active:scale-[0.98]" title="Editar ficha SGA, pictogramas y frases H/P de este producto en Excel">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>Editar SGA</span>
+              </button>
+
+              <button id="btn-pdf-preview" class="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg font-semibold transition border border-slate-200/90 shadow-2xs hover:shadow-xs active:scale-[0.98]" title="Descargar esta etiqueta en PDF vectorial">
+                <i data-lucide="file-down" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>PDF</span>
+              </button>
+
+              <div class="inline-flex items-center bg-slate-100/90 p-1 rounded-lg border border-slate-200/80 text-xs shadow-2xs">
+                <span class="text-slate-500 font-semibold px-1 text-[11px]">Copias:</span>
+                <button id="btn-preview-copies-minus" type="button" class="w-5 h-5 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs">−</button>
+                <input type="number" id="input-preview-copies" value="1" min="1" max="500" class="w-7 text-center bg-transparent font-bold text-slate-800 text-xs focus:outline-none">
+                <button id="btn-preview-copies-plus" type="button" class="w-5 h-5 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs">+</button>
               </div>
 
-              <button id="btn-print-preview" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold transition shadow-sm hover:shadow-md active:scale-[0.98]" title="Imprimir las copias seleccionadas">
+              <button id="btn-print-preview" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold transition shadow-sm hover:shadow-md hover:shadow-emerald-600/20 active:scale-[0.98]" title="Imprimir las copias seleccionadas">
                 <i data-lucide="printer" class="w-3.5 h-3.5"></i>
                 <span>Imprimir (<span id="preview-copies-badge">1</span>)</span>
               </button>
@@ -275,16 +286,28 @@
 
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400 mt-auto">
-      <span>Sistema Visor SGA Fitosanitario &bull; Lectura no bloqueante de Excel en tiempo real</span>
+    <!-- Footer Profesional Enterprise -->
+    <footer class="bg-white/90 border-t border-slate-200/80 py-3.5 px-4 text-xs text-slate-500 mt-auto backdrop-blur-sm">
+      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="font-semibold text-slate-700">SGA Label Studio Enterprise</span>
+          <span class="text-slate-400">&bull;</span>
+          <span class="text-slate-500">Lectura no bloqueante de Excel en tiempo real</span>
+        </div>
+        <div class="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
+          <span>Resolución 1496/2018 SGA</span>
+          <span>&bull;</span>
+          <span>Certificaciones ICA &bull; GlobalGAP</span>
+        </div>
+      </div>
     </footer>
 
   </div>
 
   <!-- Modal de Configuración de Directorio -->
-  <div id="modal-config" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 border border-slate-200">
+  <div id="modal-config" class="fixed inset-0 bg-slate-950/65 modal-backdrop-blur z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl modal-dialog-enterprise max-w-lg w-full p-6 space-y-4 border border-slate-200/90">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
           <i data-lucide="folder" class="w-5 h-5 text-emerald-600"></i>
@@ -294,15 +317,278 @@
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-      <p class="text-xs text-slate-600">
-        Directorio donde se encuentran los archivos <code class="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono">aplicacion.xlsm</code>, <code class="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono">Base.xlsx</code> y la carpeta <code class="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono">Picto/</code>:
-      </p>
-      <div>
-        <input type="text" id="input-dir-path" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+      <div class="space-y-1.5">
+        <label class="block text-xs font-bold text-slate-700">Ubicación de Archivos Excel:</label>
+        <p class="text-xs text-slate-500">
+          Directorio donde se encuentran los archivos <code class="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono">aplicacion.xlsm</code>, <code class="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono">Base_Actualizada.xlsx</code> y la carpeta <code class="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono">Picto/</code>:
+        </p>
+        <div>
+          <input type="text" id="input-dir-path" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button id="btn-cancel-modal" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancelar</button>
+
+      <!-- Opciones Avanzadas de Impresión en Modal para no saturar la vista principal -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Disposición en Papel:</label>
+          <select id="select-print-layout" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="continuous" selected>📜 1 Columna Continua</option>
+            <option value="2columns">📑 2 Columnas (Ahorro / Fotocopias)</option>
+            <option value="1perpage">📄 1 Etiqueta por Hoja (Rollo/Térmica)</option>
+            <option value="2perpage">📑 2 Etiquetas por Hoja</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Tanques por Lote:</label>
+          <select id="select-tanks-mode" class="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="all" selected>Todos los tanques</option>
+            <option value="1">Solo 1 tanque representativo</option>
+            <option value="2">Máx. 2 tanques</option>
+            <option value="3">Máx. 3 tanques</option>
+            <option value="5">Máx. 5 tanques</option>
+            <option value="10">Máx. 10 tanques</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button id="btn-cancel-modal" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cerrar</button>
         <button id="btn-save-dir" class="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition shadow-md shadow-emerald-600/30">Guardar y Recargar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Editor Rápido Bidireccional de Producto SGA (Guarda en Base_Actualizada.xlsx) -->
+  <div id="modal-edit-product" class="fixed inset-0 bg-slate-950/65 modal-backdrop-blur z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl modal-dialog-enterprise max-w-2xl w-full p-6 space-y-4 border border-slate-200/90 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Editor Bidireccional Excel</span>
+          <h3 id="edit-prod-title" class="font-bold text-slate-800 text-base">Editar Ficha SGA</h3>
+        </div>
+        <button id="btn-close-edit-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-edit-product" class="space-y-4">
+        <input type="hidden" id="edit-prod-name">
+        <input type="hidden" id="edit-prod-code">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Palabra de Advertencia:</label>
+            <select id="edit-prod-adv" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="PELIGRO">⚠️ PELIGRO (Riesgo Alto)</option>
+              <option value="ATENCIÓN">⚡ ATENCIÓN (Riesgo Moderado)</option>
+              <option value="SIN ADVERTENCIA">SIN ADVERTENCIA</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Unidad de Medida:</label>
+            <select id="edit-prod-um" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="LITRO">LITRO</option>
+              <option value="KILO">KILO</option>
+              <option value="GRAMO">GRAMO</option>
+              <option value="CC">CENTÍMETROS CÚBICOS (CC)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Selector Visual de Pictogramas GHS (9 Casillas) -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+            <span>Pictogramas Normativos GHS (Selecciona de 1 a 4):</span>
+            <span id="edit-picto-counter" class="text-[11px] font-semibold text-emerald-600">0/4 seleccionados</span>
+          </label>
+          <div class="grid grid-cols-3 sm:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center" id="picto-selector-grid">
+            <!-- Pictogramas GHS generados dinámicamente -->
+          </div>
+        </div>
+
+        <!-- Frases H -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Frases H (Indicaciones de Peligro):</label>
+          <textarea id="edit-prod-frase-h" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none placeholder-slate-400" placeholder="Ej: H318 Provoca lesiones oculares graves. H410 Tóxico para organismos acuáticos."></textarea>
+        </div>
+
+        <!-- Frases P -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Frases P (Consejos de Prudencia):</label>
+          <textarea id="edit-prod-frase-p" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none placeholder-slate-400" placeholder="Ej: P102 Manténgase fuera del alcance de los niños. P270 No comer ni fumar durante su uso."></textarea>
+        </div>
+
+        <!-- Operario que realiza el cambio -->
+        <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-500">Operario:</span>
+            <input type="text" id="edit-prod-operario" class="bg-slate-100 border border-slate-200 rounded px-2 py-1 text-xs font-semibold text-slate-700" value="Operario de Mezclas">
+          </div>
+
+          <div class="flex gap-2">
+            <button type="button" id="btn-cancel-edit" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancelar</button>
+            <button type="submit" id="btn-save-edit" class="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition shadow-md shadow-emerald-600/30">
+              <i data-lucide="save" class="w-3.5 h-3.5"></i>
+              <span>Guardar en Base.xlsx</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: Registro de Auditoría y Trazabilidad (ICA / GlobalGAP) -->
+  <div id="modal-audit" class="fixed inset-0 bg-slate-950/65 modal-backdrop-blur z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl modal-dialog-enterprise max-w-4xl w-full p-6 space-y-4 border border-slate-200/90 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">Trazabilidad Fitosanitaria &bull; Certificaciones ICA y GlobalGAP</h3>
+            <p class="text-xs text-slate-500">Historial inmutable de órdenes impresas, mezclas despachadas y ediciones.</p>
+          </div>
+        </div>
+        <button id="btn-close-audit-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de herramientas de auditoría -->
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="relative flex-1 max-w-xs">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+          <input type="text" id="input-audit-search" placeholder="Filtrar por operario, producto, bloque..." class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div class="flex items-center gap-2">
+          <a href="/api/audit/export" target="_blank" class="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-2xs">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Exportar CSV (Auditoría ICA)</span>
+          </a>
+          <button id="btn-refresh-audit" class="p-1.5 text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition" title="Refrescar">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabla de eventos -->
+      <div class="border border-slate-200 rounded-xl overflow-hidden flex-1 overflow-y-auto max-h-[50vh]">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-bold sticky top-0 border-b border-slate-200">
+            <tr>
+              <th class="p-2.5">Fecha / Hora</th>
+              <th class="p-2.5">Operario</th>
+              <th class="p-2.5">Acción</th>
+              <th class="p-2.5">Programa</th>
+              <th class="p-2.5">Producto</th>
+              <th class="p-2.5">Sector / Tanques</th>
+              <th class="p-2.5">Copias</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body" class="divide-y divide-slate-100 font-medium text-slate-700">
+            <tr>
+              <td colspan="7" class="p-6 text-center text-slate-400">Cargando historial de auditoría...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+        <span id="audit-total-count">0 registros encontrados</span>
+        <button id="btn-close-audit-bottom" class="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Conexión Móvil / Red Local (PWA) -->
+  <div id="modal-network" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-200 text-center">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <i data-lucide="smartphone" class="w-5 h-5 text-emerald-600"></i>
+          Acceso Móvil / Red Local
+        </h3>
+        <button id="btn-close-network-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500">
+        Escanea este código QR con la cámara de tu smartphone o tablet para abrir el Visor de Etiquetas en la caseta de mezclas:
+      </p>
+
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 inline-block mx-auto shadow-inner">
+        <img id="network-qr-img" src="/api/qr_connect" alt="Código QR de Conexión" class="w-44 h-44 mx-auto rounded-lg">
+      </div>
+
+      <div class="space-y-1.5">
+        <span class="text-[11px] font-semibold text-slate-500 block">O ingresa manualmente la dirección IP:</span>
+        <div class="flex items-center justify-center gap-2">
+          <code id="network-ip-url" class="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded text-xs font-mono font-bold">http://localhost:8000</code>
+          <button id="btn-copy-ip" class="p-1 text-slate-500 hover:text-emerald-700 transition" title="Copiar enlace">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100">
+        <p class="text-[11px] text-slate-400">💡 Ambos dispositivos deben estar conectados a la misma red WiFi.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: Exportación Directa a PDF Vectorial -->
+  <div id="modal-pdf" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <i data-lucide="file-down" class="w-5 h-5 text-emerald-600"></i>
+          Descargar PDF Vectorial
+        </h3>
+        <button id="btn-close-pdf-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Formato de Página:</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex flex-col p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition border-emerald-500 bg-emerald-50/50 has-[:checked]:border-emerald-600 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/20">
+              <input type="radio" name="pdf-layout" value="letter" checked class="sr-only">
+              <span class="font-bold text-slate-800 flex items-center gap-1.5 mb-1"><i data-lucide="file-text" class="w-4 h-4 text-emerald-600"></i> Hoja Carta</span>
+              <span class="text-[10px] text-slate-500">2 etiquetas por hoja con línea de corte</span>
+            </label>
+
+            <label class="flex flex-col p-2.5 border rounded-xl cursor-pointer hover:bg-slate-50 transition border-slate-200 has-[:checked]:border-emerald-600 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/20">
+              <input type="radio" name="pdf-layout" value="thermal" class="sr-only">
+              <span class="font-bold text-slate-800 flex items-center gap-1.5 mb-1"><i data-lucide="printer" class="w-4 h-4 text-emerald-600"></i> Rollo Térmico</span>
+              <span class="text-[10px] text-slate-500">100 &times; 150 mm (4&times;6") Zebra/Xprinter</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Operario Responsable (para Trazabilidad):</label>
+          <input type="text" id="pdf-operario" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="Operario de Mezclas">
+        </div>
+
+        <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-[11px] text-slate-600 flex items-center justify-between">
+          <span>Total etiquetas a exportar:</span>
+          <strong id="pdf-total-labels-count" class="text-emerald-700 font-mono text-xs">0</strong>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button id="btn-cancel-pdf" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancelar</button>
+        <button id="btn-confirm-pdf-export" class="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition shadow-md shadow-emerald-600/30">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Descargar PDF</span>
+        </button>
       </div>
     </div>
   </div>

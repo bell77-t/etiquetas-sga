@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import openpyxl
 
+from ghs_engine import infer_ghs_pictograms
+
 DEFAULT_SEARCH_PATHS = [
     Path(r"C:\Users\alexc\Downloads\Alejandra\Alejandra"),
     Path(__file__).resolve().parent,
@@ -184,6 +186,27 @@ def load_base_catalog(base_path: Path, picto_dir: Path) -> Dict[str, Dict[str, A
             resolve_pictogram(pig4_val, picto_catalog, picto_dir),
         ]
 
+        has_real_picto = any(p.get("has_image") for p in pictograms)
+        inferred_list = []
+        if not has_real_picto:
+            inferred = infer_ghs_pictograms(frase_h, palabra_adv)
+            if inferred:
+                inferred_list = inferred
+                new_pictos = []
+                for p in inferred[:4]:
+                    new_pictos.append({
+                        "has_image": True,
+                        "url": f"/picto/{p['filename']}",
+                        "filename": p["filename"],
+                        "label": p["name"],
+                        "code": p["code"],
+                        "inferred": True,
+                        "reason": p.get("reason", "")
+                    })
+                while len(new_pictos) < 4:
+                    new_pictos.append({"has_image": False, "url": None, "label": "SIN IMAGEN", "code": None})
+                pictograms = new_pictos
+
         prod_info = {
             "codigo": codigo,
             "nombre": str(prod_name).strip(),
@@ -192,6 +215,8 @@ def load_base_catalog(base_path: Path, picto_dir: Path) -> Dict[str, Dict[str, A
             "frase_p": frase_p,
             "palabra_advertencia": palabra_adv,
             "pictogramas": pictograms,
+            "has_inferred_pictos": bool(inferred_list),
+            "inferred_reasons": [p.get("reason") for p in inferred_list],
             "tiene_sga": str(get_val(row, "Tiene SGA", "")).strip(),
             "tiene_hds": str(get_val(row, "TIENE HOJA DE SEGURIDAD", "")).strip(),
         }
@@ -224,14 +249,15 @@ def format_date_str(val: Any) -> Dict[str, str]:
 
 def load_applications(
     app_path: Path, 
-    base_catalog: Dict[str, Dict[str, Any]]
+    base_catalog: Dict[str, Dict[str, Any]],
+    sheet_name: str = "Data"
 ) -> List[Dict[str, Any]]:
-    """Carga y procesa la programación semanal desde aplicacion.xlsm (hoja Data)."""
+    """Carga y procesa la programación semanal desde aplicacion.xlsm para la hoja especificada."""
     buf = read_file_bytes_non_blocking(app_path)
     wb = openpyxl.load_workbook(buf, data_only=True, read_only=True)
     
-    sheet_name = "Data" if "Data" in wb.sheetnames else wb.sheetnames[0]
-    ws = wb[sheet_name]
+    target_sheet = sheet_name if sheet_name in wb.sheetnames else ("Data" if "Data" in wb.sheetnames else wb.sheetnames[0])
+    ws = wb[target_sheet]
 
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
@@ -269,31 +295,73 @@ def load_applications(
     applications = []
     item_counter = 0
 
+    # Variables de contexto para herencia entre filas (típico en hojas ALZ y R-S-L)
+    curr_date_raw = None
+    default_cultivo = "Alstroemeria" if target_sheet == "ALZ" else ("Rosa Freedom" if target_sheet == "R-S-L" else "")
+    curr_cultivo = default_cultivo
+    curr_bloque = ""
+    curr_camas = ""
+    curr_litros = 0.0
+
     for row_num, row in enumerate(rows[header_idx + 1:], start=header_idx + 2):
         if not any(row):
             continue
 
+        # Saltar filas de totales (ej: 'Total 26/02/2024')
+        if str(row[0] or "").strip().upper().startswith("TOTAL"):
+            continue
+
         raw_prod = get_val(row, "PRODUCTO", "Producto", default="")
-        if not raw_prod or str(raw_prod).strip() == "" or normalize_text(raw_prod) == "PRODUCTO":
+        
+        # Actualizar contexto de fecha si viene en la fila
+        d_cand = get_val(row, "Fecha", "FECHA")
+        if d_cand is not None and str(d_cand).strip():
+            curr_date_raw = d_cand
+
+        # Actualizar contexto de cultivo
+        c_cand = get_val(row, "Cultivo")
+        if c_cand is not None and str(c_cand).strip() and not str(c_cand).strip().upper().startswith("TOTAL"):
+            curr_cultivo = str(c_cand).strip()
+
+        # Actualizar contexto de bloque
+        b_cand = get_val(row, "Bloque")
+        if b_cand is not None and str(b_cand).strip():
+            curr_bloque = str(b_cand).strip()
+
+        # Actualizar contexto de camas
+        camas_cand = get_val(row, "Camas")
+        if camas_cand is not None and str(camas_cand).strip():
+            curr_camas = camas_cand
+
+        # Actualizar contexto de litros
+        l_cand = get_val(row, "Litros Agua", "Litros")
+        if l_cand is not None:
+            try:
+                l_num = float(l_cand)
+                if l_num > 0:
+                    curr_litros = l_num
+            except (ValueError, TypeError):
+                pass
+
+        # Si no hay producto válido en esta fila, continuar (era solo fila de encabezado de bloque)
+        if not raw_prod or str(raw_prod).strip() in ("", "(en blanco)", "0", "None") or normalize_text(raw_prod) == "PRODUCTO":
             continue
 
         prod_name = str(raw_prod).strip()
-        date_raw = get_val(row, "Fecha", "FECHA")
-        date_info = format_date_str(date_raw)
+        date_info = format_date_str(curr_date_raw)
+        cultivo = curr_cultivo or default_cultivo
+        bloque = curr_bloque
+        camas = curr_camas
 
-        cultivo = str(get_val(row, "Cultivo", default="") or "").strip()
-        bloque = str(get_val(row, "Bloque", default="") or "").strip()
-        camas = get_val(row, "Camas", default="")
         reentrada = get_val(row, "Reentrada", default=0)
         categoria = get_val(row, "Categoria", "Categoría", default="")
         observaciones = str(get_val(row, "Observaciones", default="") or "").strip()
         semana = get_val(row, "Semana", default="")
 
-        litros_raw = get_val(row, "Litros Agua", "Litros", default=0)
-        try:
-            litros_total = float(litros_raw) if litros_raw is not None else 0.0
-        except (ValueError, TypeError):
-            litros_total = 0.0
+        litros_total = curr_litros
+        # Normalizar si el volumen está expresado en cc/ml (> 5,000 cc para cama/bloque estándar)
+        if litros_total > 5000:
+            litros_total = round(litros_total / 1000.0, 2)
 
         dosis_raw = get_val(row, "Dosis gr ó cc x Litro", "Dosis gr  cc x Litro", "Dosis", default=0)
         try:
@@ -503,19 +571,52 @@ class DataManager:
         self.base_filename = base_path.name
         self.base_catalog = load_base_catalog(base_path, picto_dir)
 
-        # Si existe Base.xlsx anterior y la base activa es Base_Actualizada.xlsx, complementar productos faltantes
-        legacy_base = self.data_dir / "Base.xlsx"
-        if legacy_base.exists() and legacy_base.resolve() != base_path.resolve():
-            try:
-                legacy_catalog = load_base_catalog(legacy_base, picto_dir)
-                for k, v in legacy_catalog.items():
-                    if k not in self.base_catalog:
-                        self.base_catalog[k] = v
-            except Exception:
-                pass
+        # Extraer lista única de los 228 productos maestros desde Base_Actualizada.xlsx (Columna B: Nombre del Producto)
+        seen_master_names = set()
+        self.master_products = []
+        for k, prod in self.base_catalog.items():
+            if not k.startswith("COD:"):
+                name = prod.get("nombre", "").strip()
+                if name and name.upper() not in seen_master_names:
+                    seen_master_names.add(name.upper())
+                    self.master_products.append(prod)
+        self.master_products.sort(key=lambda x: x["nombre"])
 
-        self.applications = load_applications(app_path, self.base_catalog)
+        # Cargar todos los programas disponibles en aplicacion.xlsm
+        self.programs = {}
+        sheet_meta = [
+            ("Data", "Riego Sector 3 (Data)", "droplet"),
+            ("ALZ", "Alstroemeria (ALZ)", "flower-2"),
+            ("R-S-L", "Rosas, Stock y Lirios (R-S-L)", "sparkles"),
+        ]
+
+        buf = read_file_bytes_non_blocking(app_path)
+        wb = openpyxl.load_workbook(buf, data_only=True, read_only=True)
+        available_sheets = wb.sheetnames
+
+        for s_id, s_name, s_icon in sheet_meta:
+            if s_id in available_sheets:
+                apps = load_applications(app_path, self.base_catalog, sheet_name=s_id)
+                self.programs[s_id] = {
+                    "id": s_id,
+                    "name": s_name,
+                    "icon": s_icon,
+                    "count": len(apps),
+                    "total_labels": sum(len(a["etiquetas"]) for a in apps),
+                    "applications": apps
+                }
+
+        if not hasattr(self, "current_program") or self.current_program not in self.programs:
+            self.current_program = "Data" if "Data" in self.programs else list(self.programs.keys())[0]
+
+        self.set_active_program(self.current_program)
         self.last_loaded = datetime.datetime.now()
+
+    def set_active_program(self, program_id: str):
+        if program_id not in self.programs:
+            program_id = list(self.programs.keys())[0]
+        self.current_program = program_id
+        self.applications = self.programs[program_id]["applications"]
 
         dates_seen = set()
         dates_list = []
@@ -537,13 +638,27 @@ class DataManager:
     def get_summary(self) -> Dict[str, Any]:
         total_apps = len(self.applications)
         total_labels = sum(len(a["etiquetas"]) for a in self.applications)
+        programs_summary = [
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "icon": p["icon"],
+                "count": p["count"],
+                "total_labels": p["total_labels"],
+            }
+            for p in self.programs.values()
+        ]
         return {
             "data_directory": str(self.data_dir),
             "base_file": getattr(self, "base_filename", "Base_Actualizada.xlsx"),
             "last_loaded": self.last_loaded.strftime("%Y-%m-%d %H:%M:%S") if self.last_loaded else None,
+            "current_program": self.current_program,
+            "available_programs": programs_summary,
             "total_applications": total_apps,
             "total_labels": total_labels,
-            "total_products_in_catalog": len(self.base_catalog),
+            "total_products_in_catalog": len(self.master_products),
+            "master_products": [p["nombre"] for p in self.master_products],
+            "master_products_data": self.master_products,
             "available_dates": self.available_dates,
             "available_products": self.available_products,
         }
