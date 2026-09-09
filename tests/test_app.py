@@ -203,8 +203,9 @@ class TestSGABusinessRules(unittest.TestCase):
         # 3. Ficha FDS HTML
         ficha = client.get("/ficha/1ACABA01")
         self.assertEqual(ficha.status_code, 200)
-        self.assertIn("SGA / FDS", ficha.text.upper())
-        self.assertIn("CISPROQUIM", ficha.text)
+        self.assertIn("FICHA BREVE SGA", ficha.text.upper())
+        self.assertIn("IMPRIMIR FICHA", ficha.text.upper())
+        self.assertNotIn("CISPROQUIM", ficha.text)
 
         # 4. Audit API
         audit_res = client.get("/api/audit/logs")

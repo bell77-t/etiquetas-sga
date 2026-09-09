@@ -17,13 +17,129 @@ body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-color: var(--color-canvas);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.035) 0px, transparent 45%),
-    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.035) 0px, transparent 45%);
+    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.04) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.04) 0px, transparent 50%);
   color: #0f172a;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* =========================================================
+   ANIMACIONES MODERNAS & MICRO-INTERACCIONES
+   ========================================================= */
+
+@keyframes float-glow-1 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.95);
+  }
+}
+
+@keyframes float-glow-2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(-40px, 40px) scale(1.15);
+  }
+  66% {
+    transform: translate(25px, -30px) scale(0.9);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes slide-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-float-1 {
+  animation: float-glow-1 14s ease-in-out infinite;
+}
+
+.animate-float-2 {
+  animation: float-glow-2 18s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 6s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: slide-fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-pop {
+  animation: scale-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Efectos visuales de cristal y elevación */
+.auth-glass-card {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 25px 50px -12px rgba(0, 0, 0, 0.7),
+    0 0 40px -10px rgba(16, 185, 129, 0.25);
+}
+
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+}
+
+.hover-lift:active {
+  transform: translateY(-1px) scale(0.99);
 }
 
 /* Scrollbar moderna y ultra-discreta */
@@ -96,127 +212,119 @@ body {
 .etiqueta-excel-table td,
 .etiqueta-excel-table th {
   border: 1.5px solid #000000;
-  padding: 3px 5px;
+  padding: 3px 4px;
   font-family: Arial, Helvetica, sans-serif;
   vertical-align: middle;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Fila 1 (Excel A2:D2 y E2:F2) */
 .cell-producto {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: bold;
   text-transform: uppercase;
   text-align: left;
-  padding: 5px 6px !important;
+  padding: 4px 6px !important;
   color: #000000;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .cell-advertencia {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: bold;
   text-transform: uppercase;
   text-align: center;
   color: #000000;
   letter-spacing: 0.5px;
+  padding: 4px 4px !important;
 }
 
-/* Filas 2 a 4 (Excel A3:D5) */
+/* Filas 2 a 5 (Excel A3:D6) */
 .cell-lbl {
-  font-size: 9.5px;
+  font-size: 8.5px;
   font-weight: bold;
   text-transform: uppercase;
-  width: 20%;
+  width: 22%;
   background-color: #f8fafc;
   color: #000000;
+  padding: 2.5px 4px !important;
+  white-space: nowrap;
 }
 
 .cell-val {
-  font-size: 10px;
-  width: 22%;
+  font-size: 9px;
+  width: 28%;
   color: #000000;
+  padding: 2.5px 4px !important;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .cell-lbl-sub {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: bold;
   text-transform: uppercase;
-  width: 20%;
+  width: 22%;
   background-color: #f1f5f9;
   color: #000000;
+  padding: 2.5px 4px !important;
 }
 
 .cell-val-sub {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: bold;
-  width: 22%;
+  width: 28%;
   color: #000000;
-}
-
-/* Celdas espaciadoras con bordes sólidos (Excel A6:D8) */
-.cell-empty {
-  height: 12px;
-  background-color: #ffffff;
+  padding: 2.5px 4px !important;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Bloque Superior Derecho: Matriz 2x2 Pictogramas (Excel E3:F8) */
 .cell-picto {
-  width: 62px;
-  height: 62px;
-  min-width: 62px;
-  max-width: 62px;
+  width: 58px;
+  height: 58px;
+  min-width: 58px;
+  max-width: 58px;
   text-align: center;
   vertical-align: middle;
-  padding: 2px !important;
+  padding: 1px !important;
   background-color: #ffffff;
+  overflow: hidden;
 }
 
 .cell-picto img {
-  width: 52px;
-  height: 52px;
-  max-width: 52px;
-  max-height: 52px;
+  width: 48px;
+  height: 48px;
+  max-width: 48px;
+  max-height: 48px;
   object-fit: contain;
   display: block;
   margin: 0 auto;
 }
 
-/* Placeholder Minimalista Estilizado para Pictograma Vacío (Rombo punteado suave) */
-.sin-imagen-box {
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-.sin-imagen-box svg {
-  width: 44px;
-  height: 44px;
-  display: block;
-}
-
 /* Bloque Inferior: Frases H y P (Excel A9:F12) */
 .cell-sec-header {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: bold;
   text-align: center;
   text-transform: uppercase;
-  padding: 3px 5px !important;
+  padding: 2.5px 4px !important;
   background-color: #f1f5f9;
   color: #000000;
   letter-spacing: 0.5px;
 }
 
 .cell-frase-content {
-  font-size: 9.5px;
-  line-height: 1.35;
-  padding: 5px 6px !important;
+  font-size: 8.5px;
+  line-height: 1.3;
+  padding: 4px 6px !important;
   text-align: left;
   white-space: pre-line;
   word-break: break-word;
+  overflow-wrap: break-word;
   color: #000000;
 }
 

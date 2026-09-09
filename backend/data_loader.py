@@ -7,10 +7,12 @@ from typing import Dict, List, Any, Optional
 import openpyxl
 
 from .ghs_engine import infer_ghs_pictograms
+from .validation import validate_product
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BUNDLED_CATALOG_DIR = PROJECT_ROOT / "data" / "catalog"
 BUNDLED_PICTOGRAM_DIR = PROJECT_ROOT / "static" / "picto"
+LEGACY_DATA_DIR = Path.home() / "Downloads" / "Alejandra" / "Alejandra"
 
 DEFAULT_SEARCH_PATHS = [
     Path(os.environ["SGA_DATA_DIR"]) if os.environ.get("SGA_DATA_DIR") else PROJECT_ROOT,
@@ -27,11 +29,34 @@ def find_data_directory(custom_path: Optional[str] = None) -> Path:
         if (p / "aplicacion.xlsm").exists():
             return p
 
-    for path in DEFAULT_SEARCH_PATHS:
-        if path.exists():
-            has_app = (path / "aplicacion.xlsm").exists()
-            if has_app:
-                return path
+    candidates = []
+    if custom_path:
+        candidates.append(Path(custom_path).expanduser())
+    if os.environ.get("SGA_DATA_DIR"):
+        candidates.append(Path(os.environ["SGA_DATA_DIR"]).expanduser())
+
+    # El Excel puede vivir junto al proyecto, en data/ o en el catalogo incluido.
+    candidates.extend([
+        PROJECT_ROOT,
+        PROJECT_ROOT / "data",
+        BUNDLED_CATALOG_DIR,
+        Path.cwd(),
+        Path.cwd() / "data",
+        Path.cwd() / "data" / "catalog",
+        LEGACY_DATA_DIR,
+    ])
+
+    seen = set()
+    for path in candidates:
+        try:
+            path = path.resolve()
+        except OSError:
+            continue
+        if path in seen or not path.is_dir():
+            continue
+        seen.add(path)
+        if (path / "aplicacion.xlsm").is_file():
+            return path
 
     return PROJECT_ROOT
 
@@ -117,6 +142,32 @@ def resolve_pictogram(pic_val: Any, picto_catalog: Dict[str, str], picto_dir: Pa
     return {"has_image": False, "url": None, "label": "SIN IMAGEN", "code": None}
 
 
+def limit_ghs_phrases(text: Any, max_items: int = 3, prefix_char: str = 'H') -> str:
+    """Limita frases H o P a un máximo de `max_items` (por defecto 3) para legibilidad y diseño."""
+    if not text or not str(text).strip():
+        return ""
+    raw = str(text).strip()
+    
+    # 1. Si viene con saltos de línea explícitos
+    lines = [line.strip() for line in raw.split('\n') if line.strip()]
+    if len(lines) > 1:
+        return '\n'.join(lines[:max_items])
+    
+    # 2. Si viene separado por múltiples espacios (ej: 'H319 ...       H335 ...')
+    clean_text = re.sub(r'[ \t]{2,}', '\n', raw)
+    lines2 = [l.strip() for l in clean_text.split('\n') if l.strip()]
+    if len(lines2) > 1:
+        return '\n'.join(lines2[:max_items])
+    
+    # 3. Si sigue siendo una sola línea con múltiples códigos Hxxx o Pxxx (evitando partir frases compuestas Pxxx + Pxxx)
+    parts = re.split(rf'(?<!\+)\s*(?=\b{prefix_char}\d{{3}})', raw)
+    valid_parts = [p.strip() for p in parts if p.strip()]
+    if len(valid_parts) > 1:
+        return '\n'.join(valid_parts[:max_items])
+        
+    return raw
+
+
 def load_base_catalog(base_path: Path, picto_dir: Path) -> Dict[str, Dict[str, Any]]:
     """Carga el maestro de productos desde Base.xlsx (hoja SGA)."""
     buf = read_file_bytes_non_blocking(base_path)
@@ -170,14 +221,20 @@ def load_base_catalog(base_path: Path, picto_dir: Path) -> Dict[str, Dict[str, A
         if not um:
             um = "KILO"
             
-        frase_h = str(get_val(row, "FRASES H", "")).strip()
-        frase_p = str(get_val(row, "FRASES P", "")).strip()
+        raw_frase_h = str(get_val(row, "FRASES H", "")).strip()
+        raw_frase_p = str(get_val(row, "FRASES P", "")).strip()
+        
+        # Limitar a máximo 3 frases H y 3 frases P
+        frase_h = limit_ghs_phrases(raw_frase_h, max_items=3, prefix_char='H')
+        frase_p = limit_ghs_phrases(raw_frase_p, max_items=3, prefix_char='P')
+        
         palabra_adv = str(get_val(row, "PALABRA DE ADVERTENCIA", "")).strip().upper()
         
         pig1_val = get_val(row, "PIG1", "SIN FOTO")
         pig2_val = get_val(row, "PIG2", "SIN FOTO")
         pig3_val = get_val(row, "PIG3", "SIN FOTO")
         pig4_val = get_val(row, "PIG4", "SIN FOTO")
+
 
         pictograms = [
             resolve_pictogram(pig1_val, picto_catalog, picto_dir),
@@ -220,6 +277,8 @@ def load_base_catalog(base_path: Path, picto_dir: Path) -> Dict[str, Dict[str, A
             "tiene_sga": str(get_val(row, "Tiene SGA", "")).strip(),
             "tiene_hds": str(get_val(row, "TIENE HOJA DE SEGURIDAD", "")).strip(),
         }
+        prod_info["faltantes_sga"] = validate_product(prod_info)
+        prod_info["estado_ficha"] = "COMPLETA" if not prod_info["faltantes_sga"] else "INCOMPLETA"
 
         norm_key = normalize_text(prod_name)
         products[norm_key] = prod_info
@@ -568,7 +627,10 @@ class DataManager:
         if not base_path or not base_path.exists():
             raise FileNotFoundError(f"No se encontró Base_Actualizada.xlsx ni Base.xlsx en {self.data_dir}")
         if not app_path.exists():
-            raise FileNotFoundError(f"No se encontró aplicacion.xlsm en {self.data_dir}")
+            raise FileNotFoundError(
+                f"No se encontró aplicacion.xlsm en {self.data_dir}. "
+                "Configure SGA_DATA_DIR con la carpeta que contiene los archivos Excel."
+            )
 
         self.base_filename = base_path.name
         self.base_path = base_path
@@ -606,14 +668,160 @@ class DataManager:
                     "icon": s_icon,
                     "count": len(apps),
                     "total_labels": sum(len(a["etiquetas"]) for a in apps),
-                    "applications": apps
+                    "applications": apps,
+                    "base_file": self.base_filename,
+                    "is_mipe": False
                 }
+
+        # --- CARGAR BASE DE DATOS MIPE ---
+        mipe_candidates = [
+            self.data_dir / "BD INFORMACIÓN ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
+            BUNDLED_CATALOG_DIR / "BD INFORMACIÓN ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
+            self.data_dir / "BD INFORMACION ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
+            BUNDLED_CATALOG_DIR / "BD INFORMACION ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
+        ]
+        for f_dir in [self.data_dir, BUNDLED_CATALOG_DIR]:
+            if f_dir.exists():
+                for candidate in f_dir.glob("*.xlsx"):
+                    if "2025" in candidate.name or "mipe" in candidate.name.lower():
+                        if candidate not in mipe_candidates:
+                            mipe_candidates.append(candidate)
+
+        mipe_path = None
+        for cand in mipe_candidates:
+            if cand.exists():
+                mipe_path = cand
+                break
+
+        self.mipe_path = mipe_path
+        self.mipe_catalog = {}
+        self.mipe_master_products = []
+
+        if mipe_path and mipe_path.exists():
+            self.mipe_filename = mipe_path.name
+            self.mipe_catalog = load_base_catalog(mipe_path, self.picto_dir)
+            
+            seen_mipe = set()
+            for k, prod in self.mipe_catalog.items():
+                if not k.startswith("COD:"):
+                    name = prod.get("nombre", "").strip()
+                    if name and name.upper() not in seen_mipe:
+                        seen_mipe.add(name.upper())
+                        self.mipe_master_products.append(prod)
+            self.mipe_master_products.sort(key=lambda x: x["nombre"])
+
+            # Crear aplicaciones interactivas para cada producto MIPE
+            today_date = datetime.date.today().strftime("%Y-%m-%d")
+            today_display = datetime.date.today().strftime("%d/%m/%Y")
+            mipe_apps = []
+
+            for i, p in enumerate(self.mipe_master_products, start=1):
+                app_id = f"MIPE_{p.get('codigo') or i}"
+                lbl = {
+                    "id": f"{app_id}-T1",
+                    "tanque_num": 1,
+                    "total_tanques": 1,
+                    "tipo_tanque": "Ficha MIPE SGA 2025 (Bodega / 1,000 L)",
+                    "es_colita": False,
+                    "litros_tanque": 1000.0,
+                    "dosis": 1.0,
+                    "cantidad_dosificar": 1000.0,
+                    "unidad": p.get("um", "LITRO"),
+                    "producto": p["nombre"],
+                    "sector_bloque": "MIPE / BODEGA",
+                    "reentrada": "0",
+                    "categoria": "MIPE FITOSANITARIO",
+                    "fecha": {"iso": today_date, "display": today_display},
+                    "base_info": p,
+                    "litros_total_lote": 1000.0,
+                }
+                app_item = {
+                    "id": app_id,
+                    "producto": p["nombre"],
+                    "sector_bloque": "MIPE / BODEGA",
+                    "fecha": {"iso": today_date, "display": today_display},
+                    "dosis": 1.0,
+                    "total_producto": 1000.0,
+                    "litros_total": 1000.0,
+                    "reentrada": "0",
+                    "categoria": "MIPE FITOSANITARIO",
+                    "observaciones": f"Ficha MIPE SGA 2025 - Código: {p.get('codigo', 'S/C')}",
+                    "base_info": p,
+                    "etiquetas": [lbl],
+                    "is_mipe": True,
+                }
+                mipe_apps.append(app_item)
+
+            self.programs["MIPE"] = {
+                "id": "MIPE",
+                "name": "MIPE (Catálogo 2025)",
+                "icon": "shield-alert",
+                "count": len(mipe_apps),
+                "total_labels": len(mipe_apps),
+                "applications": mipe_apps,
+                "base_file": self.mipe_filename,
+                "is_mipe": True,
+            }
+
+        # --- CARGAR PESTAÑA CATÁLOGO MIRFE COMPLETO (228 PRODUCTOS DE Base_Actualizada.xlsx) ---
+        today_date = datetime.date.today().strftime("%Y-%m-%d")
+        today_display = datetime.date.today().strftime("%d/%m/%Y")
+        base_apps = []
+        for i, p in enumerate(self.master_products, start=1):
+            app_id = f"MIRFE_{p.get('codigo') or i}"
+            lbl = {
+                "id": f"{app_id}-T1",
+                "tanque_num": 1,
+                "total_tanques": 1,
+                "tipo_tanque": "Ficha SGA MIRFE (Bodega / 1,000 L)",
+                "es_colita": False,
+                "litros_tanque": 1000.0,
+                "dosis": 1.0,
+                "cantidad_dosificar": 1000.0,
+                "unidad": p.get("um", "KILO"),
+                "producto": p["nombre"],
+                "sector_bloque": "CATÁLOGO MIRFE / BODEGA",
+                "reentrada": "0",
+                "categoria": "FITOSANITARIO",
+                "fecha": {"iso": today_date, "display": today_display},
+                "base_info": p,
+                "litros_total_lote": 1000.0,
+            }
+            app_item = {
+                "id": app_id,
+                "producto": p["nombre"],
+                "sector_bloque": "CATÁLOGO MIRFE / BODEGA",
+                "fecha": {"iso": today_date, "display": today_display},
+                "dosis": 1.0,
+                "total_producto": 1000.0,
+                "litros_total": 1000.0,
+                "reentrada": "0",
+                "categoria": "FITOSANITARIO",
+                "observaciones": f"Ficha SGA Catálogo MIRFE - Código: {p.get('codigo', 'S/C')}",
+                "base_info": p,
+                "etiquetas": [lbl],
+                "is_base": True,
+            }
+            base_apps.append(app_item)
+
+        self.programs["MIRFE"] = {
+            "id": "MIRFE",
+            "name": "MIRFE (228 SGA)",
+            "icon": "database",
+            "count": len(base_apps),
+            "total_labels": len(base_apps),
+            "applications": base_apps,
+            "base_file": self.base_filename,
+            "is_base": True,
+        }
 
         if not hasattr(self, "current_program") or self.current_program not in self.programs:
             self.current_program = "Data" if "Data" in self.programs else list(self.programs.keys())[0]
 
         self.set_active_program(self.current_program)
         self.last_loaded = datetime.datetime.now()
+
+
 
     def set_active_program(self, program_id: str):
         if program_id not in self.programs:
@@ -644,17 +852,26 @@ class DataManager:
         if selected_id not in self.programs:
             raise KeyError(selected_id)
         applications = self.programs[selected_id]["applications"]
-        dates = {item["fecha"]["iso"]: item["fecha"] for item in applications if item["fecha"]["iso"]}
+        
+        if selected_id in ["MIPE", "MIRFE", "BASE"]:
+            available_dates = []
+        else:
+            dates = {item["fecha"]["iso"]: item["fecha"] for item in applications if item["fecha"]["iso"]}
+            available_dates = sorted(dates.values(), key=lambda item: item["iso"], reverse=True)
+
+            
         products = sorted({item["producto"] for item in applications if item["producto"]})
         return {
             "program_id": selected_id,
             "applications": applications,
-            "available_dates": sorted(dates.values(), key=lambda item: item["iso"], reverse=True),
+            "available_dates": available_dates,
             "available_products": products,
         }
 
+
     def get_summary(self, program_id: Optional[str] = None) -> Dict[str, Any]:
         program_data = self.get_program_data(program_id)
+        selected_id = program_data["program_id"]
         applications = program_data["applications"]
         total_apps = len(applications)
         total_labels = sum(len(a["etiquetas"]) for a in applications)
@@ -668,17 +885,58 @@ class DataManager:
             }
             for p in self.programs.values()
         ]
+        
+        is_mipe_selected = selected_id == "MIPE"
+        master_products = self.mipe_master_products if is_mipe_selected else self.master_products
+        base_file_name = getattr(self, "mipe_filename", "BD INFORMACIÓN ETIQUETAS SGA 2025.xlsx") if is_mipe_selected else getattr(self, "base_filename", "Base_Actualizada.xlsx")
+
+        incomplete_list = []
+        for p in master_products:
+            missing_items = []
+            if not any(pic.get("has_image") for pic in p.get("pictogramas", [])):
+                missing_items.append("Sin pictogramas GHS")
+            if not p.get("frase_h", "").strip():
+                missing_items.append("Sin Frase H")
+            if not p.get("frase_p", "").strip():
+                missing_items.append("Sin Frase P")
+            if not p.get("palabra_advertencia", "").strip():
+                missing_items.append("Sin Palabra de Advertencia")
+            
+            if missing_items:
+                incomplete_list.append({
+                    "codigo": p.get("codigo") or "N/A",
+                    "nombre": p["nombre"],
+                    "um": p.get("um", "LITRO"),
+                    "palabra_advertencia": p.get("palabra_advertencia", "PELIGRO"),
+                    "faltantes": missing_items,
+                    "has_picto": any(pic.get("has_image") for pic in p.get("pictogramas", [])),
+                    "has_frase_h": bool(p.get("frase_h", "").strip()),
+                    "has_frase_p": bool(p.get("frase_p", "").strip()),
+                    "has_adv": bool(p.get("palabra_advertencia", "").strip()),
+                })
+
+        without_pictograms = sum(1 for item in incomplete_list if "Sin pictogramas GHS" in item["faltantes"])
+        without_safety_text = sum(1 for item in incomplete_list if "Sin Frase H" in item["faltantes"] or "Sin Frase P" in item["faltantes"])
+
         return {
             "data_directory": str(self.data_dir),
-            "base_file": getattr(self, "base_filename", "Base_Actualizada.xlsx"),
+            "base_file": base_file_name,
             "last_loaded": self.last_loaded.strftime("%Y-%m-%d %H:%M:%S") if self.last_loaded else None,
             "current_program": program_data["program_id"],
             "available_programs": programs_summary,
             "total_applications": total_apps,
             "total_labels": total_labels,
-            "total_products_in_catalog": len(self.master_products),
-            "master_products": [p["nombre"] for p in self.master_products],
-            "master_products_data": self.master_products,
+            "total_products_in_catalog": len(master_products),
+            "master_products": [p["nombre"] for p in master_products],
+            "master_products_data": master_products,
             "available_dates": program_data["available_dates"],
             "available_products": program_data["available_products"],
+            "quality": {
+                "without_pictograms": without_pictograms,
+                "without_safety_text": without_safety_text,
+                "total_incomplete": len(incomplete_list),
+                "incomplete_products": incomplete_list,
+            },
         }
+
+

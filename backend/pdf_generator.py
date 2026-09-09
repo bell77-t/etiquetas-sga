@@ -48,6 +48,26 @@ def get_pictogram_image(picto_info: Dict[str, Any], picto_dir: Path, size_pt: fl
     except Exception:
         return None
 
+def limit_ghs_phrases(text: Any, max_items: int = 3, prefix_char: str = 'H') -> str:
+    """Limita frases H o P a un máximo de `max_items` (3) para no desbordar la celda PDF."""
+    if not text or not str(text).strip():
+        return ""
+    import re
+    raw = str(text).strip()
+    lines = [line.strip() for line in raw.split('\n') if line.strip()]
+    if len(lines) > 1:
+        return '\n'.join(lines[:max_items])
+    clean_text = re.sub(r'[ \t]{2,}', '\n', raw)
+    lines2 = [l.strip() for l in clean_text.split('\n') if l.strip()]
+    if len(lines2) > 1:
+        return '\n'.join(lines2[:max_items])
+    parts = re.split(rf'(?<!\+)\s*(?=\b{prefix_char}\d{{3}})', raw)
+    valid_parts = [p.strip() for p in parts if p.strip()]
+    if len(valid_parts) > 1:
+        return '\n'.join(valid_parts[:max_items])
+    return raw
+
+
 def build_label_table(label: Dict[str, Any], picto_dir: Path, qr_base_url: str, total_width_mm: float = 190.0) -> Table:
     """Construye una tabla ReportLab con la réplica exacta de la etiqueta SGA A2:F12."""
     styles = getSampleStyleSheet()
@@ -105,9 +125,13 @@ def build_label_table(label: Dict[str, Any], picto_dir: Path, qr_base_url: str, 
 
     categoria = label.get("categoria", "")
 
-    # Frases H y P
-    frase_h = base.get("frase_h") or "No clasificado como peligroso / Sin frases H registradas."
-    frase_p = base.get("frase_p") or "P102 Manténgase fuera del alcance de los niños.\nP270 No comer, beber ni fumar durante su utilización."
+    # Frases H y P limitadas a máximo 3 frases
+    raw_h = base.get("frase_h") or "No clasificado como peligroso / Sin frases H registradas."
+    raw_p = base.get("frase_p") or "P102 Manténgase fuera del alcance de los niños.\nP270 No comer, beber ni fumar durante su utilización."
+    
+    frase_h = limit_ghs_phrases(raw_h, max_items=3, prefix_char='H')
+    frase_p = limit_ghs_phrases(raw_p, max_items=3, prefix_char='P')
+
 
     col_w = (total_width_mm * mm) / 6.0
     

@@ -5,6 +5,7 @@ Permite modificar pictogramas, frases H/P, advertencia y unidad de medida desde 
 
 import shutil
 import threading
+import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import openpyxl
@@ -115,9 +116,22 @@ def _update_product_in_excel_locked(base_path: Path, update_data: Dict[str, Any]
                 else:
                     ws.cell(target_row, c_idx).value = "SIN FOTO"
 
-    # 6. Guardar cambios en el archivo Excel
-    wb.save(base_path)
-    wb.close()
+    # 6. Guardar en archivo temporal, comprobar que se puede reabrir y reemplazar
+    # atómicamente el original. El catálogo nunca queda parcialmente escrito.
+    temp_path = base_path.with_name(f".{base_path.stem}.sga-tmp{base_path.suffix}")
+    try:
+        wb.save(temp_path)
+        wb.close()
+        verification = openpyxl.load_workbook(temp_path, read_only=True, data_only=False)
+        if ws.title not in verification.sheetnames:
+            raise ValueError("La verificación del archivo temporal falló.")
+        verification.close()
+        os.replace(temp_path, base_path)
+    except Exception:
+        if temp_path.exists(): temp_path.unlink()
+        try: wb.close()
+        except Exception: pass
+        raise
 
     return {
         "success": True,

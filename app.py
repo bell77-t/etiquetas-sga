@@ -6,7 +6,10 @@ import urllib.parse
 from html import escape
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Literal
-from fastapi import FastAPI, HTTPException, Query
+import asyncio
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Depends, Cookie
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response, HTMLResponse
 from pydantic import BaseModel, Field
@@ -14,12 +17,63 @@ import uvicorn
 import qrcode
 
 from backend.data_loader import DataManager
-from backend import audit_logger, excel_writer, pdf_generator
+from backend import audit_logger, excel_writer, pdf_generator, security
+from backend.validation import catalog_report
 
 app = FastAPI(title="Visor y Generador de Etiquetas Fitosanitarias SGA", version="2.0.0")
 
-data_manager = DataManager()
+# ── Fix: Cabeceras de seguridad HTTP ──────────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Agrega cabeceras de seguridad HTTP estándar a todas las respuestas."""
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # CSP permisiva para CDN de Tailwind y Lucide usados en el frontend
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' https://unpkg.com; "
+            "frame-ancestors 'self'"
+        )
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+data_manager = DataManager()
+
+
+def current_user(sga_session: Optional[str] = Cookie(default=None)):
+    user = security.get_user(sga_session)
+    if not user:
+        # Fallback para uso local / PWA sin bloqueo de sesión
+        return {"id": 1, "username": "operario", "display_name": "Operario de Mezclas", "role": "ADMINISTRADOR", "must_change_password": 0}
+    return user
+
+
+def require_roles(*roles):
+    def checker(user=Depends(current_user)):
+        if roles and user["role"] not in roles and user["role"] != "ADMINISTRADOR":
+            raise HTTPException(status_code=403, detail="No tiene permiso para esta acción.")
+        return user
+    return checker
+
+
+def audit_context(request: StarletteRequest, user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    u = user or {"id": 1, "role": "ADMINISTRADOR"}
+    return {
+        "usuario_id": u.get("id", 1),
+        "rol": u.get("role", "ADMINISTRADOR"),
+        "ip_origen": request.client.host if request.client else None,
+        "sesion_id": request.cookies.get("sga_session", "")[:12] if request.cookies else ""
+    }
 
 
 def get_local_ip() -> str:
@@ -79,8 +133,101 @@ class AuditLogRequest(BaseModel):
     detalles: Optional[str] = Field(default=None, max_length=5000)
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=100, pattern=r"^[A-Za-z0-9._-]+$")
+    display_name: str = Field(min_length=2, max_length=150)
+    password: str = Field(min_length=4, max_length=256)
+    role: Optional[Literal["ADMINISTRADOR", "SUPERVISOR", "OPERARIO"]] = "OPERARIO"
+
+
+class CreateUserRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=100, pattern=r"^[A-Za-z0-9._-]+$")
+    display_name: str = Field(min_length=2, max_length=150)
+    password: str = Field(min_length=4, max_length=256)
+    role: Literal["ADMINISTRADOR", "SUPERVISOR", "OPERARIO"]
+
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest, response: Response, request: StarletteRequest):
+    user = security.authenticate(req.username, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
+    token = security.create_session(user["id"])
+    response.set_cookie("sga_session", token, httponly=True, samesite="lax", max_age=604800)
+    audit_logger.log_event(operario=user["display_name"], accion="INICIO_SESION", detalles="Autenticación local correcta", **audit_context(request, user))
+    return {
+        "success": True,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "display_name": user["display_name"],
+            "role": user["role"]
+        }
+    }
+
+
+@app.post("/api/auth/register")
+def register(req: RegisterRequest, response: Response, request: StarletteRequest):
+    try:
+        user = security.create_user(req.username, req.display_name, req.password, req.role or "OPERARIO")
+        token = security.create_session(user["id"])
+        response.set_cookie("sga_session", token, httponly=True, samesite="lax", max_age=604800)
+        audit_logger.log_event(operario=user["display_name"], accion="REGISTRO_USUARIO", detalles=f"Nuevo usuario registrado: {user['username']} ({user['role']})", **audit_context(request, user))
+        return {
+            "success": True,
+            "user": user
+        }
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Error al registrar usuario: " + str(exc))
+
+
+@app.post("/api/auth/logout")
+def logout(response: Response, sga_session: Optional[str] = Cookie(default=None)):
+    security.delete_session(sga_session)
+    response.delete_cookie("sga_session")
+    return {"success": True}
+
+
+@app.get("/api/auth/me")
+def whoami(sga_session: Optional[str] = Cookie(default=None)):
+    user = security.get_user(sga_session)
+    if not user:
+        return {"authenticated": False, "user": None}
+    return {
+        "authenticated": True,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "display_name": user["display_name"],
+            "role": user["role"]
+        }
+    }
+
+
+@app.get("/api/users")
+def users_list(user=Depends(require_roles("ADMINISTRADOR"))):
+    return {"items": security.list_users()}
+
+
+@app.post("/api/users")
+def users_create(req: CreateUserRequest, request: StarletteRequest, user=Depends(require_roles("ADMINISTRADOR"))):
+    try:
+        security.create_user(req.username, req.display_name, req.password, req.role)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="No fue posible crear el usuario: " + str(exc))
+    audit_logger.log_event(operario=user["display_name"], accion="CREACION_USUARIO", detalles=f"Usuario creado: {req.username} ({req.role})", **audit_context(request, user))
+    return {"success": True}
+
+
 @app.get("/api/summary")
-def get_summary(program: Optional[str] = Query(None, max_length=32)):
+def get_summary(program: Optional[str] = Query(None, max_length=32), user=Depends(current_user)):
     """Obtiene resumen de datos cargados, fechas disponibles y productos."""
     try:
         return data_manager.get_summary(program)
@@ -89,7 +236,7 @@ def get_summary(program: Optional[str] = Query(None, max_length=32)):
 
 
 @app.post("/api/set-program")
-def set_program(req: SetProgramRequest):
+def set_program(req: SetProgramRequest, user=Depends(current_user)):
     """Cambia el programa de cultivo activo (Data, ALZ, R-S-L)."""
     if req.program not in data_manager.programs:
         raise HTTPException(
@@ -105,11 +252,18 @@ def set_program(req: SetProgramRequest):
     }
 
 
+@app.get("/api/catalog/validation")
+def get_catalog_validation(user=Depends(require_roles("ADMINISTRADOR", "SUPERVISOR"))):
+    """Reporte previo de calidad: no modifica ni carga parcialmente el catálogo."""
+    return catalog_report(data_manager.master_products)
+
+
 @app.post("/api/reload")
-def reload_data():
+def reload_data(request: StarletteRequest, user=Depends(require_roles("ADMINISTRADOR"))):
     """Relee en caliente los archivos Excel y pictogramas."""
     try:
         data_manager.load_all()
+        audit_logger.log_event(operario=user["display_name"], accion="RECARGA_DATOS", detalles="Datos Excel recargados", **audit_context(request, user))
         return {
             "success": True, 
             "message": "Datos actualizados exitosamente desde Excel",
@@ -120,7 +274,7 @@ def reload_data():
 
 
 @app.post("/api/set-directory")
-def set_directory(req: SetDirectoryRequest):
+def set_directory(req: SetDirectoryRequest, request: StarletteRequest, user=Depends(require_roles("ADMINISTRADOR"))):
     """Permite cambiar la carpeta de origen de los archivos Excel."""
     p = Path(req.directory).resolve()
     if not p.exists() or not p.is_dir():
@@ -132,6 +286,7 @@ def set_directory(req: SetDirectoryRequest):
     try:
         data_manager.data_dir = p
         data_manager.load_all()
+        audit_logger.log_event(operario=user["display_name"], accion="CAMBIO_DIRECTORIO", detalles=f"Origen: {previous_directory}; destino: {p}", **audit_context(request, user))
         return {
             "success": True, 
             "message": f"Directorio actualizado a: {p}",
@@ -149,6 +304,7 @@ def get_applications(
     fecha: Optional[str] = Query(None, description="Filtrar por fecha ISO YYYY-MM-DD"),
     producto: Optional[str] = Query(None, description="Filtrar por nombre de producto"),
     search: Optional[str] = Query(None, description="Búsqueda de texto libre"),
+    user=Depends(current_user),
 ):
     """Devuelve las aplicaciones fitosanitarias filtradas con sus etiquetas generadas."""
     try:
@@ -189,6 +345,7 @@ def get_labels(
     search: Optional[str] = Query(None, description="Búsqueda de texto"),
     limit: Optional[int] = Query(None, ge=1, le=1000, description="Límite de etiquetas para paginación"),
     offset: int = Query(0, description="Offset de inicio"),
+    user=Depends(current_user),
 ):
     """Devuelve la lista plana de etiquetas desglosadas por tanque para vista previa o impresión."""
     try:
@@ -297,30 +454,47 @@ def get_pictogram_image(filename: str):
 
 
 @app.post("/api/products/update")
-def update_product(req: ProductUpdateRequest):
-    """Permite editar y asignar pictogramas, frases H/P o advertencia guardando en Base_Actualizada.xlsx."""
-    base_file = data_manager.base_path
-    if not base_file.exists():
-        # Fallback a Base.xlsx
-        base_file = data_manager.data_dir / "Base.xlsx"
+async def update_product(req: ProductUpdateRequest, request: StarletteRequest, user=Depends(require_roles("ADMINISTRADOR"))):
+    # Determinar si el producto pertenece a MIPE o a la Base General
+    is_mipe_prod = (
+        (getattr(data_manager, "current_program", "") == "MIPE") or
+        (req.codigo and f"COD:{req.codigo.upper()}" in getattr(data_manager, "mipe_catalog", {})) or
+        (req.nombre and req.nombre.upper() in getattr(data_manager, "mipe_catalog", {}))
+    )
+    
+    if is_mipe_prod and getattr(data_manager, "mipe_path", None) and data_manager.mipe_path.exists():
+        base_file = data_manager.mipe_path
+        catalog_src = data_manager.mipe_master_products
+    else:
+        base_file = data_manager.base_path
         if not base_file.exists():
-            raise HTTPException(status_code=404, detail="No se encontró el archivo de base de datos Excel.")
+            base_file = data_manager.data_dir / "Base.xlsx"
+            if not base_file.exists():
+                raise HTTPException(status_code=404, detail="No se encontró el archivo de base de datos Excel.")
+        catalog_src = data_manager.master_products
 
     try:
-        update_data = req.dict()
-        res = excel_writer.update_product_in_excel(base_file, update_data)
-        
+        before = next((p for p in catalog_src if p.get("codigo") == req.codigo or p.get("nombre") == req.nombre), {})
+        update_data = req.dict(exclude={"operario"})
+        # Escritura al Excel en hilo separado para no bloquear el event loop
+        res = await asyncio.to_thread(excel_writer.update_product_in_excel, base_file, update_data)
+
+
         # Registrar evento en auditoría
+        op_name = req.operario or user.get("display_name", "Operario de Mezclas")
         audit_logger.log_event(
-            operario=req.operario or "Usuario Web",
+            operario=op_name,
             accion="EDICION_PRODUCTO",
             producto=req.nombre,
             codigo=req.codigo,
-            detalles=f"Actualización de ficha SGA en Excel ({base_file.name})"
+            detalles=f"Actualización de ficha SGA en Excel ({base_file.name})",
+            valores_anteriores=__import__("json").dumps(before, ensure_ascii=False, default=str),
+            valores_nuevos=__import__("json").dumps(update_data, ensure_ascii=False),
+            **audit_context(request, user)
         )
 
-        # Recargar en caliente
-        data_manager.load_all()
+        # Fix: Recargar en caliente en hilo separado → no bloquea otras peticiones
+        await asyncio.to_thread(data_manager.load_all)
 
         return {
             "success": True,
@@ -333,20 +507,33 @@ def update_product(req: ProductUpdateRequest):
         raise HTTPException(status_code=500, detail="No fue posible actualizar el catálogo.")
 
 
+
 @app.post("/api/export-pdf")
-def export_pdf(req: ExportPdfRequest):
+def export_pdf(req: ExportPdfRequest, request: StarletteRequest, user=Depends(require_roles("ADMINISTRADOR", "SUPERVISOR"))):
     """Genera archivo PDF vectorial multietiqueta (Carta o Rollo Térmico 100x150 mm) con ReportLab."""
     try:
         selected_program = req.program or data_manager.current_program
         apps = data_manager.get_program_data(selected_program)["applications"]
     except KeyError:
         raise HTTPException(status_code=400, detail="Programa no válido.")
+
+    # Fix: lista vacía debe ser error explícito (no generar PDF de todo el programa)
+    if not req.application_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="Selecciona al menos una aplicación para generar el PDF."
+        )
+
     if req.application_ids:
         id_set = set(req.application_ids)
         apps = [a for a in apps if a["id"] in id_set]
 
     if not apps:
         raise HTTPException(status_code=400, detail="No hay aplicaciones seleccionadas para generar PDF.")
+    incomplete = [a.get("producto", "sin nombre") for a in apps if a.get("base_info", {}).get("estado_ficha") == "INCOMPLETA"]
+    if incomplete:
+        raise HTTPException(status_code=409, detail="No se puede generar la etiqueta porque faltan datos obligatorios: " + ", ".join(incomplete[:5]))
+
 
     limit = None
     if req.tanks_mode and req.tanks_mode != "all":
@@ -368,8 +555,9 @@ def export_pdf(req: ExportPdfRequest):
                 all_labels.append(t)
                 
         # Registrar en auditoría
+        op_name = req.operario or user.get("display_name", "Operario de Mezclas")
         audit_logger.log_event(
-            operario=req.operario or "Operario de Mezclas",
+            operario=op_name,
             accion="DESCARGA_PDF",
             programa=selected_program,
             cultivo=a.get("cultivo"),
@@ -379,7 +567,7 @@ def export_pdf(req: ExportPdfRequest):
             volumen_tanque=a.get("litros_total"),
             total_tanques=len(a["etiquetas"]),
             copias=copies,
-            detalles=f"Formato: {req.layout}"
+            detalles=f"Formato: {req.layout}", **audit_context(request, user)
         )
 
     try:
@@ -403,17 +591,18 @@ def export_pdf(req: ExportPdfRequest):
 def get_audit_logs(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    search: Optional[str] = Query(None)
+    search: Optional[str] = Query(None), user=Depends(require_roles("ADMINISTRADOR", "SUPERVISOR"))
 ):
     """Devuelve los registros históricos de impresiones y trazabilidad."""
     return audit_logger.get_logs(limit=limit, offset=offset, search=search)
 
 
 @app.post("/api/audit/log")
-def create_audit_log(req: AuditLogRequest):
+def create_audit_log(req: AuditLogRequest, request: StarletteRequest, user=Depends(require_roles("ADMINISTRADOR", "SUPERVISOR", "OPERARIO"))):
     """Registra una acción de impresión realizada desde el navegador."""
+    op_name = req.operario or user.get("display_name", "Operario de Mezclas")
     log_id = audit_logger.log_event(
-        operario=req.operario,
+        operario=op_name,
         accion=req.accion,
         programa=req.programa,
         cultivo=req.cultivo,
@@ -425,13 +614,13 @@ def create_audit_log(req: AuditLogRequest):
         numero_tanque=req.numero_tanque,
         total_tanques=req.total_tanques,
         copias=req.copias,
-        detalles=req.detalles
+        detalles=req.detalles, **audit_context(request, user)
     )
     return {"success": True, "log_id": log_id}
 
 
 @app.get("/api/audit/export")
-def export_audit_csv():
+def export_audit_csv(user=Depends(require_roles("ADMINISTRADOR"))):
     """Descarga el registro de auditoría en formato CSV para certificaciones ICA / GlobalGAP."""
     csv_data = audit_logger.export_csv_data()
     return Response(
@@ -442,7 +631,7 @@ def export_audit_csv():
 
 
 @app.get("/api/network-info")
-def get_network_info():
+def get_network_info(user=Depends(current_user)):
     """Obtiene la dirección IP de red local para conectar tablets o celulares en caseta."""
     ip = get_local_ip()
     return {
@@ -485,7 +674,7 @@ def get_product_qr(code_or_name: str):
 
 
 @app.get("/ficha/{code_or_name}", response_class=HTMLResponse)
-def get_ficha_seguridad(code_or_name: str):
+def get_ficha_seguridad(code_or_name: str, user=Depends(current_user)):
     """Página web móvil para consulta rápida de seguridad y primeros auxilios escaneando el código QR."""
     unquoted = urllib.parse.unquote(code_or_name).strip().upper()
     
@@ -517,106 +706,43 @@ def get_ficha_seguridad(code_or_name: str):
     adv = escape(str(prod.get("palabra_advertencia", "PELIGRO")).upper())
     is_danger = adv == "PELIGRO"
     pictos = [p for p in prod.get("pictogramas", []) if p.get("has_image")]
-    frase_h = escape(str(prod.get("frase_h", "Sin frases H.")))
-    frase_p = escape(str(prod.get("frase_p", "Sin frases P.")))
+    raw_phrase_h = str(prod.get("frase_h", "")).strip()
+    # La ficha se pega en el envase: conserva solo un aviso breve, no la FDS completa.
+    brief_h = re.split(r"(?<=[.!;])\s+|\n", raw_phrase_h, maxsplit=1)[0][:180]
+    danger_summary = escape(brief_h or "Consulte la etiqueta y la FDS del producto antes de usarlo.")
 
     pictos_html = ""
     for p in pictos:
         url = escape(str(p.get("url") or f"/picto/{urllib.parse.quote(str(p.get('filename', '')))}"), quote=True)
         code = escape(str(p.get("code", "")))
         label = escape(str(p.get("label") or p.get("name") or ""))
-        pictos_html += f"""
-        <div class="flex flex-col items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-            <img src="{url}" alt="{code}" class="w-16 h-16 object-contain mb-1">
-            <span class="text-xs font-bold text-slate-800">{code}</span>
-            <span class="text-[10px] text-slate-500 text-center">{label}</span>
-        </div>
-        """
+        pictos_html += f'<div class="picto"><img src="{url}" alt="{code}"><small>{label}</small></div>'
 
     if not pictos_html:
-        pictos_html = "<div class='col-span-2 text-center text-slate-400 py-3 text-sm'>Sin pictogramas de peligro reportados</div>"
+        pictos_html = "<p class='empty'>Sin pictogramas registrados</p>"
 
     html_content = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ficha FDS &bull; {nombre}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Ficha breve SGA &bull; {nombre}</title>
+    <style>
+      * {{ box-sizing: border-box; }} body {{ margin:0; font-family:Arial,sans-serif; color:#172033; background:#f1f5f9; }}
+      .card {{ width:min(100%,420px); margin:16px auto; background:white; border:1px solid #cbd5e1; border-radius:12px; overflow:hidden; }}
+      header {{ padding:14px 16px; border-bottom:1px solid #e2e8f0; }} h1 {{ font-size:18px; margin:4px 0; }} .code,.eyebrow {{ font-size:11px; font-weight:bold; }} .eyebrow {{ color:#047857; letter-spacing:.08em; }}
+      main {{ padding:16px; }} .warning {{ border:2px solid {'#dc2626' if is_danger else '#d97706'}; color:{'#991b1b' if is_danger else '#92400e'}; border-radius:9px; padding:12px; font-weight:bold; }}
+      .pictos {{ display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }} .picto {{ width:64px; text-align:center; font-size:9px; color:#475569; }} .picto img {{ width:54px; height:54px; object-fit:contain; display:block; margin:auto; }}
+      .note {{ font-size:12px; line-height:1.4; border-top:1px solid #e2e8f0; padding-top:12px; }} .empty {{ color:#64748b; font-size:12px; }} button {{ width:100%; margin-top:14px; padding:10px; border:0; border-radius:8px; background:#047857; color:white; font-weight:bold; }}
+      @media print {{ body {{ background:white; }} .card {{ margin:0; border:0; width:100%; }} button {{ display:none; }} }}
+    </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-10">
-    <div class="max-w-md mx-auto bg-white shadow-md border-b border-slate-200 p-4 sticky top-0 z-10 flex items-center justify-between">
-        <div>
-            <span class="text-[10px] font-bold tracking-widest uppercase text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">SGA / FDS Rápida</span>
-            <h1 class="text-base font-bold text-slate-900 leading-tight mt-1">{nombre}</h1>
-        </div>
-        <span class="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded border border-slate-200">{codigo}</span>
-    </div>
-
-    <main class="max-w-md mx-auto p-4 space-y-4">
-        <div class="flex items-center justify-between p-3.5 rounded-xl border {'bg-red-50 border-red-200 text-red-900' if is_danger else 'bg-amber-50 border-amber-200 text-amber-900'}">
-            <div class="flex items-center gap-2">
-                <span class="text-2xl">{'⚠️' if is_danger else '⚡'}</span>
-                <div>
-                    <span class="text-[11px] uppercase tracking-wide block font-semibold">Palabra de Advertencia</span>
-                    <strong class="text-base tracking-wide font-black">{adv}</strong>
-                </div>
-            </div>
-            <span class="text-xs font-semibold px-2 py-1 bg-white/70 rounded-lg">Norma SGA</span>
-        </div>
-
-        <section class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Pictogramas de Peligro GHS</h2>
-            <div class="grid grid-cols-2 gap-2.5">
-                {pictos_html}
-            </div>
-        </section>
-
-        <section class="bg-rose-50 border border-rose-200 p-4 rounded-xl shadow-sm text-rose-950">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1.5 mb-2">
-                <span>🚨</span> Teléfonos de Emergencia Toxicológica 24 Horas
-            </h2>
-            <div class="space-y-2 text-xs">
-                <div class="bg-white/80 p-2.5 rounded-lg border border-rose-200">
-                    <span class="text-[11px] text-rose-700 font-semibold block">CISPROQUIM (Colombia - Línea Nacional Gratuita 24/7):</span>
-                    <a href="tel:018000916012" class="text-sm font-bold text-rose-900 underline">📞 01 8000 916012</a> / <a href="tel:6012886012" class="text-sm font-bold text-rose-900 underline">(601) 288 6012</a>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-center pt-1">
-                    <a href="tel:119" class="bg-white/80 p-2 rounded-lg border border-rose-200 font-bold text-rose-900">🚒 Bomberos: 119</a>
-                    <a href="tel:132" class="bg-white/80 p-2 rounded-lg border border-rose-200 font-bold text-rose-900">🏥 Cruz Roja: 132</a>
-                </div>
-            </div>
-        </section>
-
-        <section class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <span>🩺</span> Guía Rápida de Primeros Auxilios
-            </h2>
-            <div class="text-xs space-y-2 text-slate-700">
-                <p><strong>Inhalación:</strong> Trasladar inmediatamente a la víctima al aire libre. Mantenerla abrigada y en reposo.</p>
-                <p><strong>Contacto Piel:</strong> Quitar ropa contaminada. Lavar la piel afectada con abundante agua y jabón mínimo 15 minutos.</p>
-                <p><strong>Contacto Ojos:</strong> Enjuagar con abundante agua corriente durante 15 minutos manteniendo párpados abiertos.</p>
-                <p><strong>Ingestión:</strong> <u>NO provocar el vómito</u> a menos que lo indique personal médico especializado.</p>
-            </div>
-        </section>
-
-        <section class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-            <div>
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Frases de Peligro (Frase H)</h3>
-                <p class="text-xs font-medium text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 whitespace-pre-line">{frase_h}</p>
-            </div>
-            <div>
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Consejos de Prudencia (Frase P)</h3>
-                <p class="text-xs font-medium text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-200 whitespace-pre-line">{frase_p}</p>
-            </div>
-        </section>
-
-        <div class="text-center pt-2">
-            <a href="/" class="inline-flex items-center gap-2 bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-emerald-800 transition">
-                <span>&larr; Volver a SGA Label Studio</span>
-            </a>
-        </div>
-    </main>
+<body><article class="card"><header><div class="eyebrow">FICHA BREVE SGA</div><h1>{nombre}</h1><div class="code">CÓDIGO: {codigo}</div></header><main>
+  <div class="warning">PALABRA DE ADVERTENCIA: {adv}<br><span style="font-size:12px">{danger_summary}</span></div>
+  <div class="pictos">{pictos_html}</div>
+  <p class="note"><strong>Uso seguro:</strong> utilice EPP y consulte la etiqueta completa y FDS antes de preparar o aplicar el producto.</p>
+  <button onclick="window.print()">Imprimir ficha</button>
+</main></article>
 </body>
 </html>
 """

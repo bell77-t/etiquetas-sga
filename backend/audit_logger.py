@@ -34,9 +34,23 @@ def init_db():
             numero_tanque INTEGER,
             total_tanques INTEGER,
             copias INTEGER DEFAULT 1,
-            detalles TEXT
+            detalles TEXT,
+            usuario_id INTEGER,
+            rol TEXT,
+            ip_origen TEXT,
+            sesion_id TEXT,
+            resultado TEXT DEFAULT 'EXITO',
+            valores_anteriores TEXT,
+            valores_nuevos TEXT
         )
     """)
+    # Migración compatible con bases SQLite que ya existen.
+    existing = {r[1] for r in cursor.execute("PRAGMA table_info(audit_logs)")}
+    for name, definition in {
+        "usuario_id": "INTEGER", "rol": "TEXT", "ip_origen": "TEXT", "sesion_id": "TEXT",
+        "resultado": "TEXT DEFAULT 'EXITO'", "valores_anteriores": "TEXT", "valores_nuevos": "TEXT"
+    }.items():
+        if name not in existing: cursor.execute(f"ALTER TABLE audit_logs ADD COLUMN {name} {definition}")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_operario ON audit_logs(operario)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_producto ON audit_logs(producto)")
@@ -57,7 +71,10 @@ def log_event(
     total_tanques: Optional[int] = None,
     copias: int = 1,
     detalles: Optional[str] = None,
-    timestamp: Optional[str] = None
+    timestamp: Optional[str] = None,
+    usuario_id: Optional[int] = None, rol: Optional[str] = None, ip_origen: Optional[str] = None,
+    sesion_id: Optional[str] = None, resultado: str = "EXITO", valores_anteriores: Optional[str] = None,
+    valores_nuevos: Optional[str] = None
 ) -> int:
     """Registra un evento de trazabilidad."""
     init_db()
@@ -70,12 +87,14 @@ def log_event(
         INSERT INTO audit_logs (
             timestamp, operario, accion, programa, cultivo,
             sector_bloque, producto, codigo, dosis,
-            volumen_tanque, numero_tanque, total_tanques, copias, detalles
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            volumen_tanque, numero_tanque, total_tanques, copias, detalles, usuario_id, rol,
+            ip_origen, sesion_id, resultado, valores_anteriores, valores_nuevos
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         timestamp, operario or "Operario de Mezclas", accion, programa, cultivo,
         sector_bloque, producto, codigo, dosis,
-        volumen_tanque, numero_tanque, total_tanques, copias, detalles
+        volumen_tanque, numero_tanque, total_tanques, copias, detalles, usuario_id, rol,
+        ip_origen, sesion_id, resultado, valores_anteriores, valores_nuevos
     ))
     log_id = cursor.lastrowid
     conn.commit()
@@ -135,12 +154,14 @@ def export_csv_data() -> str:
         "Programa_Hoja", "Cultivo", "Sector_Bloque", "Producto_Comercial",
         "Codigo_Interno", "Dosis", "Volumen_Tanque_Litros", "Tanque_Nro",
         "Total_Tanques", "Copias_Impresas", "Detalles_Observaciones"
+        , "Usuario_ID", "Rol", "IP_Origen", "Resultado", "Valores_Anteriores", "Valores_Nuevos"
     ])
     for r in rows:
         writer.writerow([
             r["id"], r["timestamp"], r["operario"], r["accion"],
             r["programa"], r["cultivo"], r["sector_bloque"], r["producto"],
             r["codigo"], r["dosis"], r["volumen_tanque"], r["numero_tanque"],
-            r["total_tanques"], r["copias"], r["detalles"]
+            r["total_tanques"], r["copias"], r["detalles"], r["usuario_id"], r["rol"],
+            r["ip_origen"], r["resultado"], r["valores_anteriores"], r["valores_nuevos"]
         ])
     return output.getvalue()

@@ -33,7 +33,137 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body class="bg-slate-100/90 min-h-screen text-slate-800 antialiased flex flex-col selection:bg-emerald-500 selection:text-white">
+  <!-- =========================================================
+       PANTALLA DE AUTENTICACIÓN (LOGIN & REGISTER) CON ANIMACIONES
+       ========================================================= -->
+  <div id="auth-overlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 overflow-y-auto p-4 transition-all duration-500">
+    <!-- Fondos animados con brillo flotante -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+      <div class="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-float-1"></div>
+      <div class="absolute top-1/2 -right-40 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl animate-float-2"></div>
+      <div class="absolute -bottom-40 left-1/3 w-96 h-96 bg-emerald-600/15 rounded-full blur-3xl animate-pulse-glow"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:24px_24px] opacity-10"></div>
+    </div>
+
+    <!-- Contenedor Principal del Formulario Glassmorphism -->
+    <div class="relative w-full max-w-md auth-glass-card rounded-3xl p-6 sm:p-8 space-y-6 text-white my-auto animate-scale-pop z-10">
+      <!-- Header / Logo -->
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 ring-2 ring-white/20 mx-auto transform hover:rotate-6 transition-transform duration-300">
+          <i data-lucide="shield-check" class="w-7 h-7"></i>
+        </div>
+        <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
+          <span>SGA Label Studio</span>
+          <span class="text-[10px] tracking-wide font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">v2.4</span>
+        </h2>
+        <p class="text-xs text-slate-400 font-medium">Control de Acceso Fitosanitario SGA &bull; ICA</p>
+      </div>
+
+      <!-- Selector de Pestañas (Login / Register) -->
+      <div class="bg-slate-900/90 p-1 rounded-2xl border border-slate-800 flex relative">
+        <button id="tab-btn-login" type="button" class="flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
+          <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+          <span>Iniciar Sesión</span>
+        </button>
+        <button id="tab-btn-register" type="button" class="flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 text-slate-400 hover:text-white">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+          <span>Registrarse</span>
+        </button>
+      </div>
+
+      <!-- Alerta de Error / Éxito en Auth -->
+      <div id="auth-alert" class="hidden p-3 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all animate-fade-in-up">
+        <i id="auth-alert-icon" data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+        <span id="auth-alert-text">Mensaje</span>
+      </div>
+
+      <!-- FORMULARIO 1: INICIAR SESIÓN -->
+      <form id="form-login" class="space-y-4">
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-300">Usuario o Código de Operario:</label>
+          <div class="relative flex items-center">
+            <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+            <input type="text" id="login-username" required placeholder="ej: admin o operario" class="w-full bg-slate-900/80 border border-slate-700/80 hover:border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-all">
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-300">Contraseña:</label>
+          <div class="relative flex items-center">
+            <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+            <input type="password" id="login-password" required placeholder="Ingresa tu contraseña" class="w-full bg-slate-900/80 border border-slate-700/80 hover:border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:outline-none transition-all">
+            <button type="button" id="btn-toggle-login-pass" class="absolute right-3 p-1 text-slate-400 hover:text-white transition">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-submit-login" class="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 hover:shadow-emerald-600/50 transition-all duration-300 flex items-center justify-center gap-2 active:scale-[0.98]">
+          <i data-lucide="log-in" class="w-4 h-4"></i>
+          <span>Entrar al Sistema</span>
+        </button>
+
+        <!-- Accesos Rápidos Demo -->
+        <div class="pt-2 border-t border-slate-800/80 space-y-2">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center">Accesos de Prueba:</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btn-quick-admin" class="py-1.5 px-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/40 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1.5 shadow-2xs">
+              <i data-lucide="shield" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Admin (admin123)</span>
+            </button>
+            <button type="button" id="btn-quick-operario" class="py-1.5 px-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/40 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1.5 shadow-2xs">
+              <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Operario (operario123)</span>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- FORMULARIO 2: REGISTRO DE USUARIO -->
+      <form id="form-register" class="space-y-4 hidden">
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-300">Nombre Completo:</label>
+          <div class="relative flex items-center">
+            <i data-lucide="badge-check" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+            <input type="text" id="reg-displayname" required placeholder="ej: Carlos Rodríguez" class="w-full bg-slate-900/80 border border-slate-700/80 hover:border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-all">
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-300">Nombre de Usuario (Login):</label>
+          <div class="relative flex items-center">
+            <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+            <input type="text" id="reg-username" required placeholder="ej: crodriguez" class="w-full bg-slate-900/80 border border-slate-700/80 hover:border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-all">
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-300">Rol en Bodega / Campo:</label>
+          <select id="reg-role" class="w-full bg-slate-900/80 border border-slate-700/80 hover:border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none transition-all">
+            <option value="OPERARIO">Operario de Mezclas</option>
+            <option value="SUPERVISOR">Supervisor Fitosanitario / Agrónomo</option>
+            <option value="ADMINISTRADOR">Administrador de Sistema</option>
+          </select>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-300">Contraseña:</label>
+          <div class="relative flex items-center">
+            <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+            <input type="password" id="reg-password" required placeholder="Crea tu contraseña (mín. 4 caracteres)" class="w-full bg-slate-900/80 border border-slate-700/80 hover:border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl py-2.5 pl-10 pr-10 text-xs text-white placeholder-slate-500 focus:outline-none transition-all">
+            <button type="button" id="btn-toggle-reg-pass" class="absolute right-3 p-1 text-slate-400 hover:text-white transition">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-submit-register" class="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 hover:shadow-emerald-600/50 transition-all duration-300 flex items-center justify-center gap-2 active:scale-[0.98]">
+          <i data-lucide="user-plus" class="w-4 h-4"></i>
+          <span>Registrar y Entrar</span>
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- Interfaz de Usuario Normal -->
   <div id="app-root" class="flex flex-col flex-1">
@@ -62,18 +192,26 @@
           </div>
         </div>
 
-        <!-- Acciones Principales (Limpias, funcionales y sin adornos redundantes) -->
+        <!-- Acciones Principales y Perfil de Usuario -->
         <div class="flex items-center space-x-2">
+          <!-- Chip de Usuario Autenticado -->
+          <div id="user-profile-badge" class="hidden sm:flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 px-2.5 py-1.5 rounded-xl shadow-xs">
+            <div class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold ring-1 ring-emerald-500/30">
+              <i data-lucide="user" class="w-3.5 h-3.5"></i>
+            </div>
+            <div class="text-left">
+              <span id="user-display-name" class="text-xs font-bold text-slate-200 block leading-tight">Operario</span>
+              <span id="user-role-badge" class="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">OPERARIO</span>
+            </div>
+            <button id="btn-logout" class="ml-1 p-1 text-slate-400 hover:text-red-400 hover:bg-slate-700/60 rounded-md transition" title="Cerrar sesión">
+              <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
           <!-- Botón Móvil / Red Local -->
           <button id="btn-network-info" class="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Conectar smartphone o tablet en red local (PWA)">
             <i data-lucide="smartphone" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span class="hidden sm:inline">Móvil / Red</span>
-          </button>
-
-          <!-- Botón Registro de Auditoría ICA -->
-          <button id="btn-open-audit" class="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Historial y Trazabilidad para certificaciones ICA / GlobalGAP">
-            <i data-lucide="clipboard-check" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span class="hidden sm:inline">Auditoría ICA</span>
+            <span class="hidden md:inline">Móvil / Red</span>
           </button>
 
           <!-- Botón Recargar Excel en caliente -->
@@ -118,8 +256,38 @@
               </label>
               <span id="program-status-badge" class="text-[11px] font-semibold text-slate-400"></span>
             </div>
-            <div id="program-tabs" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div id="program-tabs" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
               <!-- Se puebla dinamicamente -->
+            </div>
+
+            <!-- Banner de Calidad y Diagnóstico de Fichas SGA Incompletas -->
+            <div id="quality-container" class="hidden mt-3 p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl space-y-2 shadow-2xs">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                  </div>
+                  <div>
+                    <span id="quality-summary-title" class="text-xs font-bold text-amber-950 block">Diagnóstico SGA: Productos incompletos</span>
+                    <span id="quality-summary-subtitle" class="text-[11px] text-amber-800 font-medium">Revisa los productos que requieren pictogramas o frases H/P</span>
+                  </div>
+                </div>
+                
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button id="btn-toggle-incomplete-filter" type="button" class="flex items-center gap-1.5 bg-amber-100/90 hover:bg-amber-200 text-amber-900 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition border border-amber-300 shadow-2xs active:scale-[0.98]" title="Mostrar solo los productos que tienen datos faltantes">
+                    <i data-lucide="filter" class="w-3 h-3 text-amber-700"></i>
+                    <span id="btn-filter-incomplete-text">Filtrar incompletos</span>
+                  </button>
+                  <button id="btn-open-quality-modal" type="button" class="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition shadow-xs hover:shadow-md hover:shadow-amber-600/20 active:scale-[0.98]" title="Abrir ventana interactiva con el desglose exacto de qué falta en cada producto">
+                    <i data-lucide="list-checks" class="w-3.5 h-3.5"></i>
+                    <span>Ver cuáles faltan</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="quality-chips-container" class="flex items-center gap-2 pt-1 border-t border-amber-200/60 text-[11px] text-amber-900 flex-wrap">
+                <!-- Se puebla dinamicamente -->
+              </div>
             </div>
           </div>
 
@@ -589,6 +757,64 @@
           <i data-lucide="download" class="w-4 h-4"></i>
           <span>Descargar PDF</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 6: Diagnóstico Detallado de Productos Incompletos (Faltantes SGA) -->
+  <div id="modal-quality-detail" class="fixed inset-0 bg-slate-950/65 modal-backdrop-blur z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl modal-dialog-enterprise max-w-3xl w-full p-6 space-y-4 border border-slate-200/90 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 shadow-2xs">
+            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+              <span>Productos con Información SGA Pendiente</span>
+              <span id="modal-quality-badge-count" class="text-xs bg-amber-100 text-amber-900 border border-amber-200 font-bold px-2 py-0.5 rounded-full">0</span>
+            </h3>
+            <p id="modal-quality-program-name" class="text-xs text-slate-500">Listado de productos que no tienen pictogramas o frases H/P asignadas.</p>
+          </div>
+        </div>
+        <button id="btn-close-quality-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Barra de Filtros y Búsqueda en el Modal -->
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="relative flex-1 min-w-[220px]">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+          <input type="text" id="input-quality-search" placeholder="Buscar por nombre o código del producto..." class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none transition">
+        </div>
+
+        <div class="flex items-center gap-1.5 flex-wrap" id="quality-filter-tabs">
+          <button data-filter="all" class="quality-filter-btn px-2.5 py-1 rounded-lg text-xs font-bold transition bg-amber-600 text-white shadow-2xs">
+            Todos (<span id="count-q-all">0</span>)
+          </button>
+          <button data-filter="picto" class="quality-filter-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition border border-slate-200">
+            Sin Pictogramas (<span id="count-q-picto">0</span>)
+          </button>
+          <button data-filter="phrase" class="quality-filter-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition border border-slate-200">
+            Sin Frases H/P (<span id="count-q-phrase">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- Listado de Productos Incompletos -->
+      <div class="border border-slate-200 rounded-xl overflow-hidden flex-1 overflow-y-auto max-h-[50vh] bg-slate-50/50">
+        <div id="quality-items-container" class="divide-y divide-slate-100">
+          <!-- Items generados dinámicamente -->
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span>Puedes hacer clic en <strong>Editar Ficha SGA</strong> para añadir pictogramas y frases inmediatamente.</span>
+        </div>
+        <button id="btn-close-quality-bottom" class="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cerrar</button>
       </div>
     </div>
   </div>

@@ -3,6 +3,7 @@
  */
 
 let state = {
+  currentUser: null,
   summary: null,
   currentProgram: "Data",
   applications: [],
@@ -11,6 +12,9 @@ let state = {
   selectedDate: null,
   selectedProduct: "",
   searchQuery: "",
+  filterOnlyIncomplete: false,
+  qualityFilterTab: "all",
+  qualitySearchQuery: "",
   selectedAppIds: new Set(),
   activeApp: null,
   activeLabelIndex: 0,
@@ -20,6 +24,32 @@ let state = {
 
 // Elementos DOM
 const dom = {
+  // Autenticación & Perfil
+  authOverlay: document.getElementById("auth-overlay"),
+  tabBtnLogin: document.getElementById("tab-btn-login"),
+  tabBtnRegister: document.getElementById("tab-btn-register"),
+  formLogin: document.getElementById("form-login"),
+  formRegister: document.getElementById("form-register"),
+  loginUsername: document.getElementById("login-username"),
+  loginPassword: document.getElementById("login-password"),
+  btnToggleLoginPass: document.getElementById("btn-toggle-login-pass"),
+  btnSubmitLogin: document.getElementById("btn-submit-login"),
+  btnQuickAdmin: document.getElementById("btn-quick-admin"),
+  btnQuickOperario: document.getElementById("btn-quick-operario"),
+  regDisplayname: document.getElementById("reg-displayname"),
+  regUsername: document.getElementById("reg-username"),
+  regRole: document.getElementById("reg-role"),
+  regPassword: document.getElementById("reg-password"),
+  btnToggleRegPass: document.getElementById("btn-toggle-reg-pass"),
+  btnSubmitRegister: document.getElementById("btn-submit-register"),
+  authAlert: document.getElementById("auth-alert"),
+  authAlertIcon: document.getElementById("auth-alert-icon"),
+  authAlertText: document.getElementById("auth-alert-text"),
+  userProfileBadge: document.getElementById("user-profile-badge"),
+  userDisplayName: document.getElementById("user-display-name"),
+  userRoleBadge: document.getElementById("user-role-badge"),
+  btnLogout: document.getElementById("btn-logout"),
+
   lblExcelPath: document.getElementById("lbl-excel-path"),
   metricCatalog: document.getElementById("metric-catalog"),
   metricDates: document.getElementById("metric-dates"),
@@ -27,6 +57,28 @@ const dom = {
   metricLabels: document.getElementById("metric-labels"),
   programTabs: document.getElementById("program-tabs"),
   programStatusBadge: document.getElementById("program-status-badge"),
+  qualityAlert: document.getElementById("quality-alert"),
+  qualityContainer: document.getElementById("quality-container"),
+  qualitySummaryTitle: document.getElementById("quality-summary-title"),
+  qualitySummarySubtitle: document.getElementById("quality-summary-subtitle"),
+  qualityChipsContainer: document.getElementById("quality-chips-container"),
+  btnToggleIncompleteFilter: document.getElementById("btn-toggle-incomplete-filter"),
+  btnFilterIncompleteText: document.getElementById("btn-filter-incomplete-text"),
+  btnOpenQualityModal: document.getElementById("btn-open-quality-modal"),
+
+  // Modal Diagnóstico de Fichas Incompletas
+  modalQualityDetail: document.getElementById("modal-quality-detail"),
+  modalQualityBadgeCount: document.getElementById("modal-quality-badge-count"),
+  modalQualityProgramName: document.getElementById("modal-quality-program-name"),
+  btnCloseQualityModal: document.getElementById("btn-close-quality-modal"),
+  btnCloseQualityBottom: document.getElementById("btn-close-quality-bottom"),
+  inputQualitySearch: document.getElementById("input-quality-search"),
+  qualityFilterTabs: document.getElementById("quality-filter-tabs"),
+  qualityItemsContainer: document.getElementById("quality-items-container"),
+  countQAll: document.getElementById("count-q-all"),
+  countQPicto: document.getElementById("count-q-picto"),
+  countQPhrase: document.getElementById("count-q-phrase"),
+
   datePills: document.getElementById("date-pills"),
   btnClearDate: document.getElementById("btn-clear-date"),
   selectProduct: document.getElementById("select-product"),
@@ -113,10 +165,302 @@ const dom = {
 };
 
 // Inicialización
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
-  loadData();
+  setupAuthEventListeners();
+  await checkAuthStatus();
 });
+
+// ==========================================
+// MÓDULO DE AUTENTICACIÓN Y SESIÓN DE USUARIO
+// ==========================================
+
+function setupAuthEventListeners() {
+  // Pestañas Login / Registro
+  if (dom.tabBtnLogin && dom.tabBtnRegister) {
+    dom.tabBtnLogin.addEventListener("click", () => switchAuthTab("login"));
+    dom.tabBtnRegister.addEventListener("click", () => switchAuthTab("register"));
+  }
+
+  // Toggle visibilidad contraseña Login
+  if (dom.btnToggleLoginPass && dom.loginPassword) {
+    dom.btnToggleLoginPass.addEventListener("click", () => {
+      const type = dom.loginPassword.getAttribute("type") === "password" ? "text" : "password";
+      dom.loginPassword.setAttribute("type", type);
+      const icon = dom.btnToggleLoginPass.querySelector("i");
+      if (icon) {
+        icon.setAttribute("data-lucide", type === "password" ? "eye" : "eye-off");
+        lucide.createIcons();
+      }
+    });
+  }
+
+  // Toggle visibilidad contraseña Register
+  if (dom.btnToggleRegPass && dom.regPassword) {
+    dom.btnToggleRegPass.addEventListener("click", () => {
+      const type = dom.regPassword.getAttribute("type") === "password" ? "text" : "password";
+      dom.regPassword.setAttribute("type", type);
+      const icon = dom.btnToggleRegPass.querySelector("i");
+      if (icon) {
+        icon.setAttribute("data-lucide", type === "password" ? "eye" : "eye-off");
+        lucide.createIcons();
+      }
+    });
+  }
+
+  // Accesos Rápidos Demo
+  if (dom.btnQuickAdmin) {
+    dom.btnQuickAdmin.addEventListener("click", () => {
+      switchAuthTab("login");
+      if (dom.loginUsername) dom.loginUsername.value = "admin";
+      if (dom.loginPassword) dom.loginPassword.value = "admin123";
+      hideAuthAlert();
+    });
+  }
+
+  if (dom.btnQuickOperario) {
+    dom.btnQuickOperario.addEventListener("click", () => {
+      switchAuthTab("login");
+      if (dom.loginUsername) dom.loginUsername.value = "operario";
+      if (dom.loginPassword) dom.loginPassword.value = "operario123";
+      hideAuthAlert();
+    });
+  }
+
+  // Formulario Login
+  if (dom.formLogin) {
+    dom.formLogin.addEventListener("submit", handleLogin);
+  }
+
+  // Formulario Registro
+  if (dom.formRegister) {
+    dom.formRegister.addEventListener("submit", handleRegister);
+  }
+
+  // Botón Cerrar Sesión
+  if (dom.btnLogout) {
+    dom.btnLogout.addEventListener("click", handleLogout);
+  }
+}
+
+function switchAuthTab(tab) {
+  hideAuthAlert();
+  if (tab === "login") {
+    if (dom.tabBtnLogin) dom.tabBtnLogin.className = "flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-md shadow-emerald-600/30";
+    if (dom.tabBtnRegister) dom.tabBtnRegister.className = "flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 text-slate-400 hover:text-white";
+    if (dom.formLogin) dom.formLogin.classList.remove("hidden");
+    if (dom.formRegister) dom.formRegister.classList.add("hidden");
+    dom.loginUsername?.focus();
+  } else {
+    if (dom.tabBtnRegister) dom.tabBtnRegister.className = "flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-md shadow-emerald-600/30";
+    if (dom.tabBtnLogin) dom.tabBtnLogin.className = "flex-1 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 text-slate-400 hover:text-white";
+    if (dom.formRegister) dom.formRegister.classList.remove("hidden");
+    if (dom.formLogin) dom.formLogin.classList.add("hidden");
+    dom.regDisplayname?.focus();
+  }
+  lucide.createIcons();
+}
+
+function showAuthAlert(type, message) {
+  if (!dom.authAlert || !dom.authAlertText) return;
+  dom.authAlert.classList.remove("hidden", "bg-red-500/20", "text-red-300", "border-red-500/40", "bg-emerald-500/20", "text-emerald-300", "border-emerald-500/40");
+  
+  if (type === "error") {
+    dom.authAlert.classList.add("bg-red-500/20", "text-red-300", "border", "border-red-500/40");
+    if (dom.authAlertIcon) dom.authAlertIcon.setAttribute("data-lucide", "alert-circle");
+  } else {
+    dom.authAlert.classList.add("bg-emerald-500/20", "text-emerald-300", "border", "border-emerald-500/40");
+    if (dom.authAlertIcon) dom.authAlertIcon.setAttribute("data-lucide", "check-circle");
+  }
+  dom.authAlertText.textContent = message;
+  lucide.createIcons();
+}
+
+function hideAuthAlert() {
+  if (dom.authAlert) dom.authAlert.classList.add("hidden");
+}
+
+function showAuthOverlay() {
+  if (dom.authOverlay) {
+    dom.authOverlay.classList.remove("hidden", "opacity-0", "pointer-events-none");
+    dom.authOverlay.classList.add("opacity-100");
+  }
+  if (dom.userProfileBadge) {
+    dom.userProfileBadge.classList.add("hidden");
+  }
+}
+
+function hideAuthOverlay() {
+  if (dom.authOverlay) {
+    dom.authOverlay.classList.add("opacity-0", "pointer-events-none");
+    setTimeout(() => {
+      dom.authOverlay.classList.add("hidden");
+    }, 400);
+  }
+}
+
+function updateProfileBadge(user) {
+  if (!user) {
+    if (dom.userProfileBadge) dom.userProfileBadge.classList.add("hidden");
+    return;
+  }
+  if (dom.userDisplayName) dom.userDisplayName.textContent = user.display_name || user.username;
+  if (dom.userRoleBadge) {
+    dom.userRoleBadge.textContent = user.role || "OPERARIO";
+    if (user.role === "ADMINISTRADOR") {
+      dom.userRoleBadge.className = "text-[9px] font-bold text-amber-400 uppercase tracking-wider";
+    } else if (user.role === "SUPERVISOR") {
+      dom.userRoleBadge.className = "text-[9px] font-bold text-teal-400 uppercase tracking-wider";
+    } else {
+      dom.userRoleBadge.className = "text-[9px] font-bold text-emerald-400 uppercase tracking-wider";
+    }
+  }
+  if (dom.userProfileBadge) {
+    dom.userProfileBadge.classList.remove("hidden");
+  }
+  if (dom.pdfOperario) {
+    dom.pdfOperario.value = user.display_name || user.username;
+  }
+}
+
+async function checkAuthStatus() {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        state.currentUser = data.user;
+        updateProfileBadge(data.user);
+        hideAuthOverlay();
+        await loadData();
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn("Error al verificar sesión:", err);
+  }
+  state.currentUser = null;
+  showAuthOverlay();
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  hideAuthAlert();
+  
+  const username = dom.loginUsername ? dom.loginUsername.value.trim() : "";
+  const password = dom.loginPassword ? dom.loginPassword.value : "";
+
+  if (!username || !password) {
+    showAuthAlert("error", "Por favor completa el usuario y la contraseña.");
+    return;
+  }
+
+  const submitBtn = dom.btnSubmitLogin;
+  const originalHtml = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Ingresando...</span>`;
+    lucide.createIcons();
+  }
+
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showAuthAlert("error", data.detail || "Usuario o contraseña incorrectos.");
+      return;
+    }
+
+    state.currentUser = data.user;
+    updateProfileBadge(data.user);
+    showToast(`¡Bienvenido, ${data.user.display_name}!`, "success");
+    hideAuthOverlay();
+    await loadData();
+  } catch (err) {
+    showAuthAlert("error", "Error de conexión con el servidor.");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalHtml;
+      lucide.createIcons();
+    }
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  hideAuthAlert();
+
+  const display_name = dom.regDisplayname ? dom.regDisplayname.value.trim() : "";
+  const username = dom.regUsername ? dom.regUsername.value.trim().toLowerCase() : "";
+  const role = dom.regRole ? dom.regRole.value : "OPERARIO";
+  const password = dom.regPassword ? dom.regPassword.value : "";
+
+  if (!display_name || !username || !password) {
+    showAuthAlert("error", "Por favor completa todos los campos.");
+    return;
+  }
+
+  if (password.length < 4) {
+    showAuthAlert("error", "La contraseña debe tener al menos 4 caracteres.");
+    return;
+  }
+
+  const submitBtn = dom.btnSubmitRegister;
+  const originalHtml = submitBtn ? submitBtn.innerHTML : "";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Registrando...</span>`;
+    lucide.createIcons();
+  }
+
+  try {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ display_name, username, role, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showAuthAlert("error", data.detail || "Error al registrar usuario.");
+      return;
+    }
+
+    state.currentUser = data.user;
+    updateProfileBadge(data.user);
+    showToast(`¡Cuenta creada con éxito! Bienvenido, ${data.user.display_name}`, "success");
+    hideAuthOverlay();
+    await loadData();
+  } catch (err) {
+    showAuthAlert("error", "Error de conexión con el servidor.");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalHtml;
+      lucide.createIcons();
+    }
+  }
+}
+
+async function handleLogout() {
+  if (!confirm("¿Deseas cerrar tu sesión actual?")) return;
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } catch (err) {
+    console.warn("Error en logout:", err);
+  }
+  state.currentUser = null;
+  updateProfileBadge(null);
+  showToast("Sesión cerrada correctamente.", "info");
+  showAuthOverlay();
+  switchAuthTab("login");
+}
 
 function setupEventListeners() {
   dom.btnReload.addEventListener("click", () => reloadExcelData());
@@ -518,6 +862,49 @@ function setupAdvancedFeatures() {
     dom.btnConfirmPdfExport.addEventListener("click", () => executePdfExport());
   }
 
+  // 5. Diagnóstico de Calidad y Fichas Incompletas
+  if (dom.btnOpenQualityModal) {
+    dom.btnOpenQualityModal.addEventListener("click", () => openQualityDetailModal());
+  }
+  if (dom.btnCloseQualityModal) {
+    dom.btnCloseQualityModal.addEventListener("click", () => dom.modalQualityDetail.classList.add("hidden"));
+  }
+  if (dom.btnCloseQualityBottom) {
+    dom.btnCloseQualityBottom.addEventListener("click", () => dom.modalQualityDetail.classList.add("hidden"));
+  }
+
+  if (dom.btnToggleIncompleteFilter) {
+    dom.btnToggleIncompleteFilter.addEventListener("click", () => {
+      state.filterOnlyIncomplete = !state.filterOnlyIncomplete;
+      updateIncompleteFilterButton();
+      applyFilters();
+    });
+  }
+
+  if (dom.inputQualitySearch) {
+    dom.inputQualitySearch.addEventListener("input", (e) => {
+      state.qualitySearchQuery = e.target.value.trim();
+      renderQualityDetailList();
+    });
+  }
+
+  if (dom.qualityFilterTabs) {
+    dom.qualityFilterTabs.querySelectorAll(".quality-filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.qualityFilterTab = btn.dataset.filter || "all";
+        dom.qualityFilterTabs.querySelectorAll(".quality-filter-btn").forEach(b => {
+          const isActive = b.dataset.filter === state.qualityFilterTab;
+          b.className = `quality-filter-btn px-2.5 py-1 rounded-lg text-xs transition ${
+            isActive
+              ? 'bg-amber-600 text-white font-bold shadow-2xs'
+              : 'text-slate-600 hover:bg-slate-100 font-semibold border border-slate-200'
+          }`;
+        });
+        renderQualityDetailList();
+      });
+    });
+  }
+
   // Interacción visual en radios de formato PDF
   if (dom.modalPdf) {
     const pdfRadios = dom.modalPdf.querySelectorAll('input[name="pdf-layout"]');
@@ -554,6 +941,9 @@ function openEditProductModal(prod) {
   dom.editProdFraseP.value = prod.frase_p || "";
 
   renderPictoSelectorGrid(prod.pictogramas || []);
+  if (dom.editProdOperario && state.currentUser) {
+    dom.editProdOperario.value = state.currentUser.display_name || state.currentUser.username;
+  }
   dom.modalEditProduct.classList.remove("hidden");
   lucide.createIcons();
 }
@@ -681,6 +1071,10 @@ function openPdfModal(isBatch = true) {
     dom.pdfTotalLabelsCount.textContent = `${totalLabels} ${totalLabels === 1 ? 'etiqueta' : 'etiquetas'}`;
   }
 
+  if (dom.pdfOperario && state.currentUser) {
+    dom.pdfOperario.value = state.currentUser.display_name || state.currentUser.username;
+  }
+
   dom.modalPdf.dataset.batch = isBatch ? "true" : "false";
   dom.modalPdf.classList.remove("hidden");
   lucide.createIcons();
@@ -762,15 +1156,13 @@ async function loadData() {
     const appsData = await appsRes.json();
     state.applications = appsData.items;
 
+    // Iniciar siempre mostrando todos los lotes de la pestaña sin filtrar por fecha
+    state.selectedDate = null;
+    if (dom.btnClearDate) dom.btnClearDate.classList.add("hidden");
+
     updateHeaderSummary();
     renderProgramTabs();
     populateProductDropdown();
-
-    if (!state.selectedDate && state.summary.available_dates.length > 0) {
-      state.selectedDate = state.summary.available_dates[0].iso;
-      dom.btnClearDate.classList.remove("hidden");
-    }
-
     renderDatePills();
     applyFilters();
 
@@ -810,10 +1202,56 @@ function updateHeaderSummary() {
     dom.lblExcelPath.title = `${state.summary.data_directory} (${state.summary.base_file || 'Base'})`;
   }
   if (dom.metricCatalog) dom.metricCatalog.textContent = state.summary.total_products_in_catalog || 228;
-  if (dom.metricDates) dom.metricDates.textContent = state.summary.available_dates.length;
+  if (dom.metricDates) dom.metricDates.textContent = state.summary.available_dates ? state.summary.available_dates.length : 0;
   if (dom.metricApps) dom.metricApps.textContent = state.summary.total_applications;
   if (dom.metricLabels) dom.metricLabels.textContent = state.summary.total_labels;
+  
+  const quality = state.summary.quality || {};
+  const incompleteList = quality.incomplete_products || [];
+  const withoutPictos = quality.without_pictograms || 0;
+  const withoutSafety = quality.without_safety_text || 0;
+  const totalIncomplete = quality.total_incomplete || incompleteList.length;
+
+  if (dom.qualityContainer) {
+    if (totalIncomplete > 0) {
+      dom.qualityContainer.classList.remove("hidden");
+      if (dom.qualitySummaryTitle) {
+        dom.qualitySummaryTitle.textContent = `${totalIncomplete} ${totalIncomplete === 1 ? 'producto incompleto' : 'productos incompletos'} en ${state.currentProgram || 'este catálogo'}`;
+      }
+      if (dom.qualitySummarySubtitle) {
+        dom.qualitySummarySubtitle.textContent = `Faltan pictogramas normativos o frases de seguridad H/P para certificar la ficha.`;
+      }
+      if (dom.qualityChipsContainer) {
+        dom.qualityChipsContainer.innerHTML = `
+          <span class="inline-flex items-center gap-1 bg-amber-100/90 text-amber-900 px-2 py-0.5 rounded-md font-bold">
+            <i data-lucide="image-off" class="w-3 h-3 text-amber-700"></i> ${withoutPictos} sin pictograma
+          </span>
+          <span class="inline-flex items-center gap-1 bg-amber-100/90 text-amber-900 px-2 py-0.5 rounded-md font-bold">
+            <i data-lucide="file-text" class="w-3 h-3 text-amber-700"></i> ${withoutSafety} sin frases H/P
+          </span>
+        `;
+      }
+    } else {
+      dom.qualityContainer.classList.add("hidden");
+    }
+  }
+
+  updateIncompleteFilterButton();
   lucide.createIcons();
+}
+
+function updateIncompleteFilterButton() {
+  if (!dom.btnToggleIncompleteFilter || !dom.btnFilterIncompleteText) return;
+  const quality = state.summary ? (state.summary.quality || {}) : {};
+  const totalIncomplete = quality.total_incomplete || (quality.incomplete_products || []).length;
+
+  if (state.filterOnlyIncomplete) {
+    dom.btnToggleIncompleteFilter.className = "flex items-center gap-1.5 bg-amber-600 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition shadow-xs active:scale-[0.98]";
+    dom.btnFilterIncompleteText.textContent = `Mostrando incompletos (${totalIncomplete})`;
+  } else {
+    dom.btnToggleIncompleteFilter.className = "flex items-center gap-1.5 bg-amber-100/90 hover:bg-amber-200 text-amber-900 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition border border-amber-300 shadow-2xs active:scale-[0.98]";
+    dom.btnFilterIncompleteText.textContent = `Filtrar incompletos (${totalIncomplete})`;
+  }
 }
 
 function renderProgramTabs() {
@@ -891,7 +1329,7 @@ async function switchProgram(programId) {
     state.masterProducts = state.summary.master_products_data || [];
     state.applications = data.applications || [];
 
-    // Limpiar selecciones previas
+    // Mostrar todos los lotes de la pestaña inmediatamente sin preseleccionar fecha
     state.selectedDate = null;
     state.selectedProduct = "";
     state.searchQuery = "";
@@ -899,6 +1337,7 @@ async function switchProgram(programId) {
     state.activeApp = null;
     state.activeLabelIndex = 0;
 
+    if (dom.btnClearDate) dom.btnClearDate.classList.add("hidden");
     if (dom.inputSearch) dom.inputSearch.value = "";
     if (dom.btnClearSearch) dom.btnClearSearch.classList.add("hidden");
     if (dom.searchMatchBadge) dom.searchMatchBadge.classList.add("hidden");
@@ -906,14 +1345,6 @@ async function switchProgram(programId) {
     updateHeaderSummary();
     renderProgramTabs();
     populateProductDropdown();
-
-    if (state.summary.available_dates && state.summary.available_dates.length > 0) {
-      state.selectedDate = state.summary.available_dates[0].iso;
-      dom.btnClearDate.classList.remove("hidden");
-    } else {
-      dom.btnClearDate.classList.add("hidden");
-    }
-
     renderDatePills();
     applyFilters();
 
@@ -923,7 +1354,7 @@ async function switchProgram(programId) {
       renderEmptyPreview();
     }
 
-    showToast(`Cambiado al programa: ${programId}`, "success");
+    showToast(`Cambiado al programa: ${programId} (${state.applications.length} lotes listados)`, "success");
   } catch (err) {
     showToast("Error al cambiar de programa: " + err.message, "error");
   }
@@ -933,7 +1364,38 @@ function renderDatePills() {
   if (!state.summary) return;
   dom.datePills.innerHTML = "";
 
-  state.summary.available_dates.forEach(d => {
+  const available = state.summary.available_dates || [];
+  if (available.length === 0) {
+    const infoSpan = document.createElement("span");
+    infoSpan.className = "text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1.5";
+    infoSpan.innerHTML = `<i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600"></i> Todos los ${state.applications.length} productos listados`;
+    dom.datePills.appendChild(infoSpan);
+    lucide.createIcons();
+    return;
+  }
+
+  // Chip "Todos los lotes"
+  const allBtn = document.createElement("button");
+  const isAllSelected = state.selectedDate === null;
+  allBtn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 border ${
+    isAllSelected 
+      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/25 ring-2 ring-emerald-600/20" 
+      : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-slate-200/80 shadow-2xs"
+  }`;
+  allBtn.innerHTML = `
+    <span>Todos</span>
+    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${isAllSelected ? 'bg-emerald-700 text-emerald-50' : 'bg-slate-200/80 text-slate-500'}">${state.applications.length}</span>
+  `;
+  allBtn.addEventListener("click", () => {
+    state.selectedDate = null;
+    dom.btnClearDate.classList.add("hidden");
+    renderDatePills();
+    applyFilters();
+  });
+  dom.datePills.appendChild(allBtn);
+
+  // Chips por cada fecha
+  available.forEach(d => {
     const isSelected = state.selectedDate === d.iso;
     const btn = document.createElement("button");
     btn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 border ${
@@ -966,30 +1428,78 @@ function renderDatePills() {
 }
 
 function populateProductDropdown() {
-  if (!state.summary) return;
+  if (!dom.selectProduct || !state.summary) return;
   const currentVal = dom.selectProduct.value;
-  dom.selectProduct.innerHTML = '<option value="">Todos los Productos fitosanitarios (228 en Base)...</option>';
+  const currentProg = state.currentProgram || "Data";
+  const isMipe = currentProg === "MIPE";
+  const isMirfe = currentProg === "MIRFE" || currentProg === "BASE";
 
-  const scheduled = state.summary.available_products || [];
-  const master = state.summary.master_products || [];
+  // 1. Obtener todos los productos únicos de la pestaña activa y ordenarlos alfabéticamente
+  const tabProducts = Array.from(new Set(
+    (state.applications || []).map(a => a.producto).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
 
-  if (scheduled.length > 0) {
-    const groupSched = document.createElement("optgroup");
-    groupSched.label = `Programados esta semana en aplicacion.xlsm (${scheduled.length})`;
-    scheduled.forEach(p => {
+  dom.selectProduct.innerHTML = "";
+
+  // 2. Opción principal por defecto
+  const defaultOpt = document.createElement("option");
+  defaultOpt.value = "";
+  defaultOpt.textContent = `Todos los productos fitosanitarios (${tabProducts.length} en ${currentProg})...`;
+  dom.selectProduct.appendChild(defaultOpt);
+
+  if (isMipe) {
+    const mipeProds = (state.summary.master_products || tabProducts).slice().sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+    const groupMipe = document.createElement("optgroup");
+    groupMipe.label = `Catálogo MIPE 2025 (${mipeProds.length} productos en orden alfabético)`;
+    mipeProds.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      if (p === currentVal) opt.selected = true;
+      groupMipe.appendChild(opt);
+    });
+    dom.selectProduct.appendChild(groupMipe);
+    return;
+  }
+
+  if (isMirfe) {
+    const mirfeProds = (state.summary.master_products || tabProducts).slice().sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+    const groupMirfe = document.createElement("optgroup");
+    groupMirfe.label = `Catálogo MIRFE (${mirfeProds.length} productos en orden alfabético)`;
+    mirfeProds.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      if (p === currentVal) opt.selected = true;
+      groupMirfe.appendChild(opt);
+    });
+    dom.selectProduct.appendChild(groupMirfe);
+    return;
+  }
+
+  // 3. Pestañas semanales (Data, ALZ, R-S-L): Productos de la hoja activa
+  if (tabProducts.length > 0) {
+    const groupTab = document.createElement("optgroup");
+    groupTab.label = `Productos en ${currentProg} (${tabProducts.length} en orden alfabético)`;
+    tabProducts.forEach(p => {
       const opt = document.createElement("option");
       opt.value = p;
       opt.textContent = `📋 ${p}`;
       if (p === currentVal) opt.selected = true;
-      groupSched.appendChild(opt);
+      groupTab.appendChild(opt);
     });
-    dom.selectProduct.appendChild(groupSched);
+    dom.selectProduct.appendChild(groupTab);
   }
 
-  if (master.length > 0) {
+  // 4. Catálogo general completo (excluyendo los que ya están en la hoja activa)
+  const masterProds = (state.summary.master_products || [])
+    .filter(p => !tabProducts.includes(p))
+    .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+
+  if (masterProds.length > 0) {
     const groupMaster = document.createElement("optgroup");
-    groupMaster.label = `Catálogo Base Completo - Base_Actualizada.xlsx (${master.length})`;
-    master.forEach(p => {
+    groupMaster.label = `Otros productos del Catálogo Base (${masterProds.length} en orden alfabético)`;
+    masterProds.forEach(p => {
       const opt = document.createElement("option");
       opt.value = p;
       opt.textContent = p;
@@ -999,6 +1509,8 @@ function populateProductDropdown() {
     dom.selectProduct.appendChild(groupMaster);
   }
 }
+
+
 
 function normalizeSearchText(str) {
   if (!str) return "";
@@ -1012,6 +1524,12 @@ function normalizeSearchText(str) {
 
 function applyFilters() {
   let filtered = [...state.applications];
+
+  if (state.filterOnlyIncomplete) {
+    const quality = state.summary ? (state.summary.quality || {}) : {};
+    const incompleteProds = new Set((quality.incomplete_products || []).map(p => normalizeSearchText(p.nombre)));
+    filtered = filtered.filter(a => incompleteProds.has(normalizeSearchText(a.producto)));
+  }
 
   if (state.selectedDate) {
     filtered = filtered.filter(a => a.fecha.iso === state.selectedDate);
@@ -1448,121 +1966,358 @@ function setActiveApp(app, labelIndex = 0) {
 /**
  * Genera el HTML exacto de la plantilla física de Excel (A2:F12)
  */
+function limitGhsPhrases(text, maxItems = 3, prefixChar = 'H') {
+  if (!text || !text.toString().trim()) return '';
+  const raw = text.toString().trim();
+  
+  // 1. Dividir por saltos de línea explícitos
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    return lines.slice(0, maxItems).join('\n');
+  }
+  
+  // 2. Si viene separado por múltiples espacios (ej: 'H319 ...       H335 ...')
+  const clean = raw.replace(/[ \t]{2,}/g, '\n');
+  const lines2 = clean.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines2.length > 1) {
+    return lines2.slice(0, maxItems).join('\n');
+  }
+  
+  // 3. Si viene con múltiples códigos Hxxx o Pxxx en una sola línea (evitando separar Pxxx + Pxxx)
+  const regex = new RegExp(`(?<!\\+)\\s*(?=\\b${prefixChar}\\d{3})`, 'g');
+  const parts = raw.split(regex).map(p => p.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    return parts.slice(0, maxItems).join('\n');
+  }
+  
+  return raw;
+}
+
 function generateExcelLabelHTML(label) {
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, char => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
   }[char]));
   const base = label.base_info || {};
-  const pictos = base.pictogramas || [];
-  const p1 = pictos[0] || { has_image: false };
-  const p2 = pictos[1] || { has_image: false };
-  const p3 = pictos[2] || { has_image: false };
-  const p4 = pictos[3] || { has_image: false };
+  const allPictos = (base.pictogramas || []).filter(p => p && p.has_image && p.url);
+  
+  const numPictos = allPictos.length;
+  const p1 = allPictos[0] || null;
+  const p2 = allPictos[1] || null;
+  const p3 = allPictos[2] || null;
+  const p4 = allPictos[3] || null;
 
-  const emptyPictoBox = `<div class="sin-imagen-box" title="Sin pictograma"><svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 5 L43 24 L24 43 L5 24 Z" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 3" fill="#f8fafc"/><circle cx="24" cy="24" r="2" fill="#94a3b8"/></svg></div>`;
+  const hasTopPictos = numPictos >= 1;
+  const hasBottomPictos = numPictos >= 3;
 
-  function renderPictoCell(p) {
-    if (p && p.has_image && p.url) {
-      return `<img src="${p.url}" alt="${p.label || 'Pictograma'}" onerror="this.outerHTML='<div class=\\\'sin-imagen-box\\\' title=\\\'Sin pictograma\\\'><svg viewBox=\\\'0 0 48 48\\\' fill=\\\'none\\\' xmlns=\\\'http://www.w3.org/2000/svg\\\'><path d=\\\'M24 5 L43 24 L24 43 L5 24 Z\\\' stroke=\\\'#cbd5e1\\\' stroke-width=\\\'1.5\\\' stroke-dasharray=\\\'3 3\\\' fill=\\\'#f8fafc\\\'/><circle cx=\\\'24\\\' cy=\\\'24\\\' r=\\\'2\\\' fill=\\\'#94a3b8\\\'/></svg></div>'">`;
-    }
-    return emptyPictoBox;
+  // Frases H y P limitadas a máximo 3 frases
+  const rawFraseH = base.frase_h || 'No clasificado como peligroso / Sin frases H.';
+  const rawFraseP = base.frase_p || 'P102 Manténgase fuera del alcance de los niños.\nP270 No comer, beber ni fumar durante su utilización.';
+  const displayFraseH = limitGhsPhrases(rawFraseH, 3, 'H');
+  const displayFraseP = limitGhsPhrases(rawFraseP, 3, 'P');
+
+  let rowsHtml = '';
+
+  // Fila 1: Producto y Advertencia
+  rowsHtml += `
+    <tr>
+      <td colspan="4" class="cell-producto">${escapeHtml(label.producto)}</td>
+      <td colspan="2" class="cell-advertencia">${escapeHtml(base.palabra_advertencia || 'PELIGRO')}</td>
+    </tr>
+  `;
+
+  if (!hasTopPictos) {
+    // CASO 1: SIN PICTOGRAMAS (Layout limpio de 6 columnas sin huecos a la derecha)
+    rowsHtml += `
+      <tr>
+        <td class="cell-lbl">BLOQUE</td>
+        <td class="cell-val"><strong>${escapeHtml(label.sector_bloque)}</strong></td>
+        <td class="cell-lbl">FECHA APLICACIÓN</td>
+        <td colspan="3" class="cell-val"><strong>${escapeHtml(label.fecha.display)}</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">DOSIS</td>
+        <td class="cell-val"><strong>${formatNumber(label.dosis)} ${escapeHtml(label.unidad)}/L</strong></td>
+        <td class="cell-lbl">REENTRADA</td>
+        <td colspan="3" class="cell-val"><strong>${escapeHtml(label.reentrada)}</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">CANTIDAD TANQUE</td>
+        <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar)} ${escapeHtml(label.unidad)}</strong></td>
+        <td class="cell-lbl">TOTAL TANQUES</td>
+        <td colspan="3" class="cell-val"><strong>${label.total_tanques}</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">CANTIDAD TOTAL</td>
+        <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar * label.total_tanques)} ${escapeHtml(label.unidad)}</strong></td>
+        <td class="cell-lbl">VOLUMEN TANQUE</td>
+        <td colspan="3" class="cell-val"><strong>${formatNumber(label.litros_tanque)} L</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">TANQUE / LOTE</td>
+        <td colspan="5" class="cell-val font-semibold text-emerald-950">${escapeHtml(label.tipo_tanque)}</td>
+      </tr>
+    `;
+  } else if (!hasBottomPictos) {
+    // CASO 2: 1 ó 2 PICTOGRAMAS (Ocupan la esquina superior derecha en Filas 2-4, Filas 5-6 ocupan todo el ancho)
+    const pictoCols = numPictos === 1
+      ? `<td rowspan="3" colspan="2" class="cell-picto"><img src="${p1.url}" alt="${p1.label || 'GHS'}"></td>`
+      : `<td rowspan="3" class="cell-picto"><img src="${p1.url}" alt="${p1.label || 'GHS'}"></td><td rowspan="3" class="cell-picto"><img src="${p2.url}" alt="${p2.label || 'GHS'}"></td>`;
+
+    rowsHtml += `
+      <tr>
+        <td class="cell-lbl">BLOQUE</td>
+        <td class="cell-val"><strong>${escapeHtml(label.sector_bloque)}</strong></td>
+        <td class="cell-lbl">FECHA APLICACIÓN</td>
+        <td class="cell-val"><strong>${escapeHtml(label.fecha.display)}</strong></td>
+        ${pictoCols}
+      </tr>
+      <tr>
+        <td class="cell-lbl">DOSIS</td>
+        <td class="cell-val"><strong>${formatNumber(label.dosis)} ${escapeHtml(label.unidad)}/L</strong></td>
+        <td class="cell-lbl">REENTRADA</td>
+        <td class="cell-val"><strong>${escapeHtml(label.reentrada)}</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">CANTIDAD TANQUE</td>
+        <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar)} ${escapeHtml(label.unidad)}</strong></td>
+        <td class="cell-lbl">TOTAL TANQUES</td>
+        <td class="cell-val"><strong>${label.total_tanques}</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">CANTIDAD TOTAL</td>
+        <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar * label.total_tanques)} ${escapeHtml(label.unidad)}</strong></td>
+        <td class="cell-lbl">VOLUMEN TANQUE</td>
+        <td colspan="3" class="cell-val"><strong>${formatNumber(label.litros_tanque)} L</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">TANQUE / LOTE</td>
+        <td colspan="5" class="cell-val font-semibold text-emerald-950">${escapeHtml(label.tipo_tanque)}</td>
+      </tr>
+    `;
+  } else {
+    // CASO 3: 3 ó 4 PICTOGRAMAS (Matriz completa de 4 casillas sin celdas vacías sobrantes)
+    const bottomPictoCols = numPictos === 3
+      ? `<td rowspan="2" colspan="2" class="cell-picto"><img src="${p3.url}" alt="${p3.label || 'GHS'}"></td>`
+      : `<td rowspan="2" class="cell-picto"><img src="${p3.url}" alt="${p3.label || 'GHS'}"></td><td rowspan="2" class="cell-picto"><img src="${p4.url}" alt="${p4.label || 'GHS'}"></td>`;
+
+    rowsHtml += `
+      <tr>
+        <td class="cell-lbl">BLOQUE</td>
+        <td class="cell-val"><strong>${escapeHtml(label.sector_bloque)}</strong></td>
+        <td class="cell-lbl">FECHA APLICACIÓN</td>
+        <td class="cell-val"><strong>${escapeHtml(label.fecha.display)}</strong></td>
+        <td rowspan="3" class="cell-picto"><img src="${p1.url}" alt="${p1.label || 'GHS'}"></td>
+        <td rowspan="3" class="cell-picto"><img src="${p2.url}" alt="${p2.label || 'GHS'}"></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">DOSIS</td>
+        <td class="cell-val"><strong>${formatNumber(label.dosis)} ${escapeHtml(label.unidad)}/L</strong></td>
+        <td class="cell-lbl">REENTRADA</td>
+        <td class="cell-val"><strong>${escapeHtml(label.reentrada)}</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">CANTIDAD TANQUE</td>
+        <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar)} ${escapeHtml(label.unidad)}</strong></td>
+        <td class="cell-lbl">TOTAL TANQUES</td>
+        <td class="cell-val"><strong>${label.total_tanques}</strong></td>
+      </tr>
+      <tr>
+        <td class="cell-lbl">CANTIDAD TOTAL</td>
+        <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar * label.total_tanques)} ${escapeHtml(label.unidad)}</strong></td>
+        <td class="cell-lbl">VOLUMEN TANQUE</td>
+        <td class="cell-val"><strong>${formatNumber(label.litros_tanque)} L</strong></td>
+        ${bottomPictoCols}
+      </tr>
+      <tr>
+        <td class="cell-lbl">TANQUE / LOTE</td>
+        <td colspan="3" class="cell-val font-semibold text-emerald-950">${escapeHtml(label.tipo_tanque)}</td>
+      </tr>
+    `;
   }
+
+  // Frases H y P
+  rowsHtml += `
+    <tr>
+      <td colspan="6" class="cell-sec-header">FRASE H</td>
+    </tr>
+    <tr>
+      <td colspan="6" class="cell-frase-content">${escapeHtml(displayFraseH)}</td>
+    </tr>
+    <tr>
+      <td colspan="6" class="cell-sec-header">FRASE P</td>
+    </tr>
+    <tr>
+      <td colspan="6" class="cell-frase-content">${escapeHtml(displayFraseP)}</td>
+    </tr>
+  `;
 
   return `
     <div class="etiqueta-card">
       <table class="etiqueta-excel-table">
         <tbody>
-          <!-- Fila 1 (Excel A2:D2 y E2:F2): Nombre Producto | Palabra Advertencia -->
-          <tr>
-            <td colspan="4" class="cell-producto">
-              ${escapeHtml(label.producto)}
-            </td>
-            <td colspan="2" class="cell-advertencia">
-              ${escapeHtml(base.palabra_advertencia || 'PELIGRO')}
-            </td>
-          </tr>
-
-          <!-- Fila 2 (Excel A3:D3 y E3, F3): BLOQUE | FECHA APLICACIÓN | PICTO 1 | PICTO 2 -->
-          <tr>
-            <td class="cell-lbl">BLOQUE</td>
-            <td class="cell-val"><strong>${escapeHtml(label.sector_bloque)}</strong></td>
-            <td class="cell-lbl">FECHA APLICACIÓN</td>
-            <td class="cell-val"><strong>${escapeHtml(label.fecha.display)}</strong></td>
-            <td rowspan="3" class="cell-picto">
-              ${renderPictoCell(p1)}
-            </td>
-            <td rowspan="3" class="cell-picto">
-              ${renderPictoCell(p2)}
-            </td>
-          </tr>
-
-          <!-- Fila 3 (Excel A4:D4): REENTRADA | UNIDAD -->
-          <tr>
-            <td class="cell-lbl">REENTRADA</td>
-            <td class="cell-val"><strong>${escapeHtml(label.reentrada || '0')}</strong></td>
-            <td class="cell-lbl">UNIDAD</td>
-            <td class="cell-val"><strong>${escapeHtml(label.unidad)}</strong></td>
-          </tr>
-
-          <!-- Fila 4 (Excel A5:D5): CATEGORIA | CANTIDAD -->
-          <tr>
-            <td class="cell-lbl">CATEGORIA</td>
-            <td class="cell-val"><strong>${escapeHtml(label.categoria || '')}</strong></td>
-            <td class="cell-lbl">CANTIDAD</td>
-            <td class="cell-val"><strong>${formatNumber(label.cantidad_dosificar)}</strong></td>
-          </tr>
-
-          <!-- Fila 5 (Excel A6:D6 y E6, F6): VOL. TANQUE / ESPACIADOR | PICTO 3 | PICTO 4 -->
-          <tr>
-            <td class="cell-lbl-sub">VOL. TANQUE</td>
-            <td class="cell-val-sub"><strong>${formatNumber(label.litros_tanque)} L</strong></td>
-            <td class="cell-lbl-sub">ETIQUETA</td>
-            <td class="cell-val-sub"><strong>${escapeHtml(label.tipo_tanque)}</strong></td>
-            <td rowspan="3" class="cell-picto">
-              ${renderPictoCell(p3)}
-            </td>
-            <td rowspan="3" class="cell-picto">
-              ${renderPictoCell(p4)}
-            </td>
-          </tr>
-
-          <!-- Filas 6 y 7 (Excel A7:D7 y A8:D8): Espaciadores limpios (E y F ocupados por pictos 3 y 4) -->
-          <tr>
-            <td class="cell-empty">&nbsp;</td>
-            <td class="cell-empty">&nbsp;</td>
-            <td class="cell-empty">&nbsp;</td>
-            <td class="cell-empty">&nbsp;</td>
-          </tr>
-          <tr>
-            <td class="cell-empty">&nbsp;</td>
-            <td class="cell-empty">&nbsp;</td>
-            <td class="cell-empty">&nbsp;</td>
-            <td class="cell-empty">&nbsp;</td>
-          </tr>
-
-          <!-- Bloque Inferior: FRASE H Encabezado (Excel A9:F9) -->
-          <tr>
-            <td colspan="6" class="cell-sec-header">FRASE H</td>
-          </tr>
-
-          <!-- FRASE H Texto Completo Visible (Excel A10:F10) -->
-          <tr>
-            <td colspan="6" class="cell-frase-content">${escapeHtml(base.frase_h || 'No clasificado como peligroso / Sin frases H.')}</td>
-          </tr>
-
-          <!-- FRASE P Encabezado (Excel A11:F11) -->
-          <tr>
-            <td colspan="6" class="cell-sec-header">FRASE P</td>
-          </tr>
-
-          <!-- FRASE P Texto Completo Visible (Excel A12:F12) -->
-          <tr>
-            <td colspan="6" class="cell-frase-content">${escapeHtml(base.frase_p || 'P102 Manténgase fuera del alcance de los niños.\nP270 No comer, beber ni fumar durante su utilización.')}</td>
-          </tr>
+          ${rowsHtml}
         </tbody>
       </table>
     </div>
   `;
+}
+
+function openQualityDetailModal() {
+  if (!state.summary) return;
+  const quality = state.summary.quality || {};
+  const incompleteList = quality.incomplete_products || [];
+
+  if (dom.modalQualityBadgeCount) {
+    dom.modalQualityBadgeCount.textContent = `${incompleteList.length} incompletos`;
+  }
+  if (dom.modalQualityProgramName) {
+    dom.modalQualityProgramName.textContent = `Pestaña activa: ${state.currentProgram} • ${state.summary.base_file || 'Base'}`;
+  }
+  if (dom.inputQualitySearch) {
+    dom.inputQualitySearch.value = "";
+    state.qualitySearchQuery = "";
+  }
+  state.qualityFilterTab = "all";
+  if (dom.qualityFilterTabs) {
+    dom.qualityFilterTabs.querySelectorAll(".quality-filter-btn").forEach(b => {
+      const isAll = b.dataset.filter === "all";
+      b.className = `quality-filter-btn px-2.5 py-1 rounded-lg text-xs transition ${
+        isAll
+          ? 'bg-amber-600 text-white font-bold shadow-2xs'
+          : 'text-slate-600 hover:bg-slate-100 font-semibold border border-slate-200'
+      }`;
+    });
+  }
+
+  renderQualityDetailList();
+  dom.modalQualityDetail.classList.remove("hidden");
+  lucide.createIcons();
+}
+
+function renderQualityDetailList() {
+  if (!dom.qualityItemsContainer || !state.summary) return;
+  const quality = state.summary.quality || {};
+  const incompleteList = quality.incomplete_products || [];
+
+  const withoutPictos = incompleteList.filter(p => !p.has_picto);
+  const withoutSafety = incompleteList.filter(p => !p.has_frase_h || !p.has_frase_p);
+
+  if (dom.countQAll) dom.countQAll.textContent = incompleteList.length;
+  if (dom.countQPicto) dom.countQPicto.textContent = withoutPictos.length;
+  if (dom.countQPhrase) dom.countQPhrase.textContent = withoutSafety.length;
+
+  let list = [...incompleteList];
+
+  // Filtro por pestaña de tipo
+  if (state.qualityFilterTab === "picto") {
+    list = withoutPictos;
+  } else if (state.qualityFilterTab === "phrase") {
+    list = withoutSafety;
+  }
+
+  // Filtro por búsqueda
+  if (state.qualitySearchQuery) {
+    const q = normalizeSearchText(state.qualitySearchQuery);
+    list = list.filter(p => normalizeSearchText(p.nombre).includes(q) || normalizeSearchText(p.codigo).includes(q));
+  }
+
+  if (list.length === 0) {
+    dom.qualityItemsContainer.innerHTML = `
+      <div class="p-8 text-center text-slate-400">
+        <i data-lucide="check-circle" class="w-10 h-10 mx-auto mb-2 text-emerald-500"></i>
+        <p class="text-xs font-semibold text-slate-700">No hay productos que coincidan con el filtro.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  dom.qualityItemsContainer.innerHTML = "";
+  list.forEach(p => {
+    const row = document.createElement("div");
+    row.className = "p-3.5 bg-white hover:bg-slate-50/80 transition flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap";
+
+    const missingBadges = [];
+    if (!p.has_picto) {
+      missingBadges.push(`<span class="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold"><i data-lucide="image-off" class="w-3 h-3"></i> Sin Pictograma</span>`);
+    }
+    if (!p.has_frase_h) {
+      missingBadges.push(`<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-bold"><i data-lucide="file-warning" class="w-3 h-3"></i> Sin Frase H</span>`);
+    }
+    if (!p.has_frase_p) {
+      missingBadges.push(`<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-bold"><i data-lucide="file-text" class="w-3 h-3"></i> Sin Frase P</span>`);
+    }
+    if (!p.has_adv) {
+      missingBadges.push(`<span class="inline-flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-medium">Sin Palabra Adv.</span>`);
+    }
+
+    row.innerHTML = `
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <strong class="text-xs text-slate-900 font-bold truncate">${p.nombre}</strong>
+          <span class="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded">${p.codigo || 'S/C'}</span>
+          <span class="text-[10px] font-semibold text-slate-500">UM: ${p.um}</span>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          ${missingBadges.join(" ")}
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <button class="btn-q-preview text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 transition active:scale-[0.98]" title="Previsualizar etiqueta">
+          <i data-lucide="eye" class="w-3.5 h-3.5 inline mr-1 text-emerald-600"></i>
+          <span>Ver</span>
+        </button>
+        <button class="btn-q-edit bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-xs active:scale-[0.98]" title="Editar ficha SGA y agregar datos a Excel">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5 inline mr-1"></i>
+          <span>Editar SGA</span>
+        </button>
+      </div>
+    `;
+
+    const btnEdit = row.querySelector(".btn-q-edit");
+    btnEdit.addEventListener("click", () => {
+      dom.modalQualityDetail.classList.add("hidden");
+      const fullProd = (state.masterProducts || []).find(mp => mp.nombre === p.nombre) || {
+        nombre: p.nombre,
+        codigo: p.codigo,
+        palabra_advertencia: p.palabra_advertencia || "PELIGRO",
+        um: p.um || "LITRO",
+        pictogramas: [],
+        frase_h: "",
+        frase_p: ""
+      };
+      openEditProductModal(fullProd);
+    });
+
+    const btnPreview = row.querySelector(".btn-q-preview");
+    btnPreview.addEventListener("click", () => {
+      dom.modalQualityDetail.classList.add("hidden");
+      const appMatch = state.applications.find(a => normalizeSearchText(a.producto) === normalizeSearchText(p.nombre));
+      if (appMatch) {
+        setActiveApp(appMatch, 0);
+      } else {
+        const fullProd = (state.masterProducts || []).find(mp => mp.nombre === p.nombre) || {
+          nombre: p.nombre,
+          codigo: p.codigo,
+          palabra_advertencia: p.palabra_advertencia || "PELIGRO",
+          um: p.um || "LITRO",
+          pictogramas: [],
+          frase_h: "",
+          frase_p: ""
+        };
+        const synthetic = createSyntheticAppFromMaster(fullProd);
+        setActiveApp(synthetic, 0);
+      }
+      if (dom.labelPreviewCard) {
+        dom.labelPreviewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+
+    dom.qualityItemsContainer.appendChild(row);
+  });
+
+  lucide.createIcons();
 }
 
 function renderActiveLabelPreview() {
@@ -1661,6 +2416,10 @@ function printActiveLabel() {
 }
 
 function renderAndTriggerPrint(labelsToPrint) {
+  const labelWord = labelsToPrint.length === 1 ? "etiqueta" : "etiquetas";
+  if (!window.confirm(`Vas a imprimir ${labelsToPrint.length} ${labelWord}. ¿Continuar?`)) {
+    return;
+  }
   const layout = dom.selectPrintLayout ? dom.selectPrintLayout.value : "continuous";
   
   dom.printContainer.className = `print-layout-${layout}`;
