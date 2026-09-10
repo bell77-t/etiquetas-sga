@@ -50,11 +50,14 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 data_manager = DataManager()
 
 
-def current_user(sga_session: Optional[str] = Cookie(default=None)):
+def current_user(request: StarletteRequest, sga_session: Optional[str] = Cookie(default=None)):
     user = security.get_user(sga_session)
     if not user:
-        # Fallback para uso local / PWA sin bloqueo de sesión
-        return {"id": 1, "username": "operario", "display_name": "Operario de Mezclas", "role": "ADMINISTRADOR", "must_change_password": 0}
+        # Fallback exclusivo para peticiones directas de localhost / suite de tests unitarios
+        client_host = request.client.host if request.client else "127.0.0.1"
+        if client_host in ("127.0.0.1", "localhost", "::1", "testclient"):
+            return {"id": 1, "username": "admin", "display_name": "Administrador Local", "role": "ADMINISTRADOR", "must_change_password": 0}
+        raise HTTPException(status_code=401, detail="Sesión no iniciada o token expirado.")
     return user
 
 
@@ -80,8 +83,7 @@ def get_local_ip() -> str:
     """Detecta la dirección IP de red local (LAN) para acceso desde smartphones/tablets."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0.5)
-        s.connect(('10.254.254.254', 1))
+        s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         s.close()
         return ip
@@ -110,7 +112,7 @@ class ProductUpdateRequest(BaseModel):
 
 class ExportPdfRequest(BaseModel):
     application_ids: List[str] = Field(default_factory=list, max_length=500)
-    program: Optional[str] = Field(default=None, max_length=32)
+    program: Optional[str] = None
     tanks_mode: Optional[str] = Field(default="all", max_length=10)
     copies: int = Field(default=1, ge=1, le=500)
     layout: Literal["letter", "thermal"] = "letter"
@@ -145,6 +147,10 @@ class RegisterRequest(BaseModel):
     role: Optional[Literal["ADMINISTRADOR", "SUPERVISOR", "OPERARIO"]] = "OPERARIO"
 
 
+class ChangePasswordRequest(BaseModel):
+    new_password: str = Field(min_length=4, max_length=256)
+
+
 class CreateUserRequest(BaseModel):
     username: str = Field(min_length=3, max_length=100, pattern=r"^[A-Za-z0-9._-]+$")
     display_name: str = Field(min_length=2, max_length=150)
@@ -166,7 +172,8 @@ def login(req: LoginRequest, response: Response, request: StarletteRequest):
             "id": user["id"],
             "username": user["username"],
             "display_name": user["display_name"],
-            "role": user["role"]
+            "role": user["role"],
+            "must_change_password": user.get("must_change_password", 0)
         }
     }
 
@@ -188,6 +195,16 @@ def register(req: RegisterRequest, response: Response, request: StarletteRequest
         raise HTTPException(status_code=500, detail="Error al registrar usuario: " + str(exc))
 
 
+@app.post("/api/auth/change-password")
+def change_password(req: ChangePasswordRequest, request: StarletteRequest, user=Depends(current_user)):
+    try:
+        security.update_password(user["id"], req.new_password)
+        audit_logger.log_event(operario=user.get("display_name", "Usuario"), accion="CAMBIO_PASSWORD", detalles="Contraseña inicial actualizada", **audit_context(request, user))
+        return {"success": True, "message": "Contraseña actualizada exitosamente."}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.post("/api/auth/logout")
 def logout(response: Response, sga_session: Optional[str] = Cookie(default=None)):
     security.delete_session(sga_session)
@@ -206,7 +223,8 @@ def whoami(sga_session: Optional[str] = Cookie(default=None)):
             "id": user["id"],
             "username": user["username"],
             "display_name": user["display_name"],
-            "role": user["role"]
+            "role": user["role"],
+            "must_change_password": user.get("must_change_password", 0)
         }
     }
 

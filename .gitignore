@@ -22,4 +22,5 @@ Thumbs.db
 # Datos de ejecución locales
 var/
 data/input/
+dev-tools/
 *.bak

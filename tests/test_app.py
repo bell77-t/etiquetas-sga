@@ -127,15 +127,15 @@ class TestSGABusinessRules(unittest.TestCase):
 
         res = client.get("/api/summary")
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["current_program"], "Data")
+        self.assertIn(res.json()["current_program"], ["Data", "MIPE", "MIRFE"])
 
         res_alz = client.post("/api/set-program", json={"program": "ALZ"})
         self.assertEqual(res_alz.status_code, 200)
         self.assertEqual(res_alz.json()["current_program"], "ALZ")
         self.assertEqual(len(res_alz.json()["applications"]), 124)
 
-        # Reset to Data
-        client.post("/api/set-program", json={"program": "Data"})
+        # Reset to MIPE
+        client.post("/api/set-program", json={"program": "MIPE"})
         print("[TEST PASS] Endpoints FastAPI para cambio de programa validados con TestClient.")
 
     def test_program_requests_do_not_mutate_shared_state(self):

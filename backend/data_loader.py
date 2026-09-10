@@ -356,7 +356,7 @@ def load_applications(
 
     # Variables de contexto para herencia entre filas (típico en hojas ALZ y R-S-L)
     curr_date_raw = None
-    default_cultivo = "Alstroemeria" if target_sheet == "ALZ" else ("Rosa Freedom" if target_sheet == "R-S-L" else "")
+    default_cultivo = "Alstroemeria" if target_sheet == "ALZ" else ""
     curr_cultivo = default_cultivo
     curr_bloque = ""
     curr_camas = ""
@@ -652,7 +652,7 @@ class DataManager:
         sheet_meta = [
             ("Data", "Riego Sector 3 (Data)", "droplet"),
             ("ALZ", "Alstroemeria (ALZ)", "flower-2"),
-            ("R-S-L", "Rosas, Stock y Lirios (R-S-L)", "sparkles"),
+            ("R-S-L", "Sector R-S-L", "layers"),
         ]
 
         buf = read_file_bytes_non_blocking(app_path)
@@ -675,10 +675,10 @@ class DataManager:
 
         # --- CARGAR BASE DE DATOS MIPE ---
         mipe_candidates = [
-            self.data_dir / "BD INFORMACIÓN ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
-            BUNDLED_CATALOG_DIR / "BD INFORMACIÓN ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
-            self.data_dir / "BD INFORMACION ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
-            BUNDLED_CATALOG_DIR / "BD INFORMACION ETIQUETAS SGA 2025 FF-AJ (2).xlsx",
+            self.data_dir / "BD_INFORMACION_ETIQUETAS_SGA_2025.xlsx",
+            BUNDLED_CATALOG_DIR / "BD_INFORMACION_ETIQUETAS_SGA_2025.xlsx",
+            self.data_dir / "BD INFORMACION ETIQUETAS SGA 2025.xlsx",
+            BUNDLED_CATALOG_DIR / "BD INFORMACION ETIQUETAS SGA 2025.xlsx",
         ]
         for f_dir in [self.data_dir, BUNDLED_CATALOG_DIR]:
             if f_dir.exists():
@@ -754,8 +754,8 @@ class DataManager:
 
             self.programs["MIPE"] = {
                 "id": "MIPE",
-                "name": "MIPE (Catálogo 2025)",
-                "icon": "shield-alert",
+                "name": "MIPE (Catálogo Fitosanitarios)",
+                "icon": "shield-check",
                 "count": len(mipe_apps),
                 "total_labels": len(mipe_apps),
                 "applications": mipe_apps,
@@ -806,8 +806,8 @@ class DataManager:
 
         self.programs["MIRFE"] = {
             "id": "MIRFE",
-            "name": "MIRFE (228 SGA)",
-            "icon": "database",
+            "name": "MIRFE (Catálogo Fertirriego)",
+            "icon": "droplet",
             "count": len(base_apps),
             "total_labels": len(base_apps),
             "applications": base_apps,
@@ -816,7 +816,7 @@ class DataManager:
         }
 
         if not hasattr(self, "current_program") or self.current_program not in self.programs:
-            self.current_program = "Data" if "Data" in self.programs else list(self.programs.keys())[0]
+            self.current_program = "MIPE" if "MIPE" in self.programs else ("MIRFE" if "MIRFE" in self.programs else list(self.programs.keys())[0])
 
         self.set_active_program(self.current_program)
         self.last_loaded = datetime.datetime.now()
@@ -875,15 +875,20 @@ class DataManager:
         applications = program_data["applications"]
         total_apps = len(applications)
         total_labels = sum(len(a["etiquetas"]) for a in applications)
+        # Exponer los dos catálogos normativos primarios: MIPE y MIRFE
+        available_keys = [k for k in ["MIPE", "MIRFE"] if k in self.programs]
+        if not available_keys:
+            available_keys = list(self.programs.keys())
+
         programs_summary = [
             {
-                "id": p["id"],
-                "name": p["name"],
-                "icon": p["icon"],
-                "count": p["count"],
-                "total_labels": p["total_labels"],
+                "id": self.programs[k]["id"],
+                "name": self.programs[k]["name"],
+                "icon": self.programs[k]["icon"],
+                "count": self.programs[k]["count"],
+                "total_labels": self.programs[k]["total_labels"],
             }
-            for p in self.programs.values()
+            for k in available_keys
         ]
         
         is_mipe_selected = selected_id == "MIPE"

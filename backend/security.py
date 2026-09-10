@@ -58,13 +58,13 @@ def init_db() -> None:
     if not admin_user:
         conn.execute(
             "INSERT INTO users (username, display_name, password_hash, role, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("admin", "Administrador SGA", _hash("admin123"), "ADMINISTRADOR", 0, now, now)
+            ("admin", "Administrador SGA", _hash("admin123"), "ADMINISTRADOR", 1, now, now)
         )
     operario_user = conn.execute("SELECT id FROM users WHERE username = 'operario'").fetchone()
     if not operario_user:
         conn.execute(
             "INSERT INTO users (username, display_name, password_hash, role, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("operario", "Operario de Mezclas", _hash("operario123"), "OPERARIO", 0, now, now)
+            ("operario", "Operario de Mezclas", _hash("operario123"), "OPERARIO", 1, now, now)
         )
     conn.commit(); conn.close()
 
@@ -96,6 +96,21 @@ def get_user(token: Optional[str]):
 def delete_session(token: Optional[str]) -> None:
     if token:
         conn = _connect(); conn.execute("DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)); conn.commit(); conn.close()
+
+
+def update_password(user_id: int, new_password: str) -> bool:
+    if len(new_password) < 4:
+        raise ValueError("La contraseña debe tener al menos 4 caracteres.")
+    init_db()
+    conn = _connect()
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?",
+        (_hash(new_password), now, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return True
 
 
 def create_user(username: str, display_name: str, password: str, role: str = "OPERARIO") -> Dict[str, Any]:

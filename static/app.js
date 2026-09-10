@@ -162,12 +162,31 @@ const dom = {
   btnConfirmPdfExport: document.getElementById("btn-confirm-pdf-export"),
   pdfTotalLabelsCount: document.getElementById("pdf-total-labels-count"),
   pdfOperario: document.getElementById("pdf-operario"),
+
+  // Modal Confirmación y Alerta
+  modalConfirm: document.getElementById("modal-confirm"),
+  confirmTitle: document.getElementById("confirm-title"),
+  confirmMessage: document.getElementById("confirm-message"),
+  confirmIconContainer: document.getElementById("confirm-icon-container"),
+  confirmIcon: document.getElementById("confirm-icon"),
+  btnConfirmOk: document.getElementById("btn-confirm-ok"),
+  btnConfirmCancel: document.getElementById("btn-confirm-cancel"),
+
+  // Modal Cambio Obligatorio Contraseña
+  modalChangePassword: document.getElementById("modal-change-password"),
+  formChangePassword: document.getElementById("form-change-password"),
+  inputNewPassword: document.getElementById("input-new-password"),
+  inputConfirmPassword: document.getElementById("input-confirm-password"),
+  btnToggleNewPass: document.getElementById("btn-toggle-new-pass"),
+  changePassAlert: document.getElementById("change-pass-alert"),
+  changePassAlertText: document.getElementById("change-pass-alert-text"),
 };
 
 // Inicialización
 document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
   setupAuthEventListeners();
+  setupChangePasswordListeners();
   await checkAuthStatus();
 });
 
@@ -323,6 +342,105 @@ function updateProfileBadge(user) {
   }
 }
 
+function showConfirmDialog(title, message, options = {}) {
+  return new Promise((resolve) => {
+    if (!dom.modalConfirm) {
+      resolve(window.confirm(message));
+      return;
+    }
+    if (dom.confirmTitle) dom.confirmTitle.textContent = title || "¿Confirmar Acción?";
+    if (dom.confirmMessage) dom.confirmMessage.textContent = message || "";
+    if (dom.btnConfirmOk) dom.btnConfirmOk.textContent = options.confirmText || "Aceptar";
+    if (dom.btnConfirmCancel) {
+      dom.btnConfirmCancel.textContent = options.cancelText || "Cancelar";
+      dom.btnConfirmCancel.classList.toggle("hidden", !!options.hideCancel);
+    }
+    
+    dom.modalConfirm.classList.remove("hidden");
+    lucide.createIcons();
+
+    const cleanup = () => {
+      dom.modalConfirm.classList.add("hidden");
+    };
+
+    const handleOk = () => {
+      cleanup();
+      dom.btnConfirmOk.removeEventListener("click", handleOk);
+      dom.btnConfirmCancel.removeEventListener("click", handleCancel);
+      resolve(true);
+    };
+
+    const handleCancel = () => {
+      cleanup();
+      dom.btnConfirmOk.removeEventListener("click", handleOk);
+      dom.btnConfirmCancel.removeEventListener("click", handleCancel);
+      resolve(false);
+    };
+
+    dom.btnConfirmOk.addEventListener("click", handleOk);
+    dom.btnConfirmCancel.addEventListener("click", handleCancel);
+  });
+}
+
+function setupChangePasswordListeners() {
+  if (dom.btnToggleNewPass && dom.inputNewPassword) {
+    dom.btnToggleNewPass.addEventListener("click", () => {
+      const type = dom.inputNewPassword.getAttribute("type") === "password" ? "text" : "password";
+      dom.inputNewPassword.setAttribute("type", type);
+      const icon = dom.btnToggleNewPass.querySelector("i");
+      if (icon) {
+        icon.setAttribute("data-lucide", type === "password" ? "eye" : "eye-off");
+        lucide.createIcons();
+      }
+    });
+  }
+
+  if (dom.formChangePassword) {
+    dom.formChangePassword.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const p1 = dom.inputNewPassword?.value || "";
+      const p2 = dom.inputConfirmPassword?.value || "";
+
+      if (p1.length < 4) {
+        showChangePassAlert("La contraseña debe tener al menos 4 caracteres.");
+        return;
+      }
+      if (p1 !== p2) {
+        showChangePassAlert("Las contraseñas no coinciden.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/auth/change-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ new_password: p1 })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showChangePassAlert(data.detail || "Error al actualizar contraseña.");
+          return;
+        }
+
+        if (state.currentUser) {
+          state.currentUser.must_change_password = 0;
+        }
+        dom.modalChangePassword.classList.add("hidden");
+        showToast("¡Contraseña actualizada con éxito!", "success");
+      } catch (err) {
+        showChangePassAlert("Error de red al actualizar contraseña.");
+      }
+    });
+  }
+}
+
+function showChangePassAlert(msg) {
+  if (dom.changePassAlert && dom.changePassAlertText) {
+    dom.changePassAlertText.textContent = msg;
+    dom.changePassAlert.classList.remove("hidden");
+  }
+}
+
 async function checkAuthStatus() {
   try {
     const res = await fetch("/api/auth/me");
@@ -332,6 +450,15 @@ async function checkAuthStatus() {
         state.currentUser = data.user;
         updateProfileBadge(data.user);
         hideAuthOverlay();
+        if (data.user.must_change_password === 1) {
+          if (dom.modalChangePassword) {
+            dom.modalChangePassword.classList.remove("hidden");
+            dom.changePassAlert?.classList.add("hidden");
+            if (dom.inputNewPassword) dom.inputNewPassword.value = "";
+            if (dom.inputConfirmPassword) dom.inputConfirmPassword.value = "";
+            lucide.createIcons();
+          }
+        }
         await loadData();
         return;
       }
@@ -380,6 +507,17 @@ async function handleLogin(e) {
     updateProfileBadge(data.user);
     showToast(`¡Bienvenido, ${data.user.display_name}!`, "success");
     hideAuthOverlay();
+    
+    if (data.user.must_change_password === 1) {
+      if (dom.modalChangePassword) {
+        dom.modalChangePassword.classList.remove("hidden");
+        dom.changePassAlert?.classList.add("hidden");
+        if (dom.inputNewPassword) dom.inputNewPassword.value = "";
+        if (dom.inputConfirmPassword) dom.inputConfirmPassword.value = "";
+        lucide.createIcons();
+      }
+    }
+
     await loadData();
   } catch (err) {
     showAuthAlert("error", "Error de conexión con el servidor.");
@@ -449,7 +587,11 @@ async function handleRegister(e) {
 }
 
 async function handleLogout() {
-  if (!confirm("¿Deseas cerrar tu sesión actual?")) return;
+  const confirmed = await showConfirmDialog("Cerrar Sesión", "¿Deseas cerrar tu sesión actual en ETIQUETA LABEL?", {
+    confirmText: "Cerrar Sesión",
+    cancelText: "Permanecer"
+  });
+  if (!confirmed) return;
   try {
     await fetch("/api/auth/logout", { method: "POST" });
   } catch (err) {
@@ -1262,43 +1404,41 @@ function renderProgramTabs() {
   state.currentProgram = current;
 
   if (dom.programStatusBadge) {
-    dom.programStatusBadge.textContent = `${state.summary.available_programs.length} hojas disponibles`;
+    dom.programStatusBadge.textContent = `${state.summary.available_programs.length} catálogos normativos`;
   }
 
   state.summary.available_programs.forEach(prog => {
     const isSelected = prog.id === current;
     const card = document.createElement("button");
     card.type = "button";
-    card.className = `group flex flex-col p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
+    card.className = `group flex flex-col p-3 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
       isSelected
-        ? "bg-emerald-50/90 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20"
-        : "bg-slate-50/80 hover:bg-slate-100/90 border-slate-200 hover:border-slate-300 shadow-2xs"
+        ? "bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-teal-500/5 border-emerald-500 shadow-sm ring-2 ring-emerald-500/25"
+        : "bg-slate-50/80 hover:bg-slate-100/90 border-slate-200/80 hover:border-slate-300 shadow-2xs"
     }`;
 
-    let cleanName = prog.name.replace(/\s*\([^)]*\)/, "");
+    let cleanName = prog.name;
 
     card.innerHTML = `
-      <div class="flex items-center justify-between w-full mb-1">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <div class="w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-colors ${
-            isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600 group-hover:bg-slate-300'
+      <div class="flex items-center justify-between w-full mb-1.5">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+            isSelected ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30' : 'bg-slate-200 text-slate-600 group-hover:bg-slate-300'
           }">
-            <i data-lucide="${prog.icon || 'layers'}" class="w-3 h-3"></i>
+            <i data-lucide="${prog.icon || 'layers'}" class="w-4 h-4"></i>
           </div>
-          <span class="text-xs font-bold truncate ${isSelected ? 'text-emerald-950' : 'text-slate-800'}">
+          <span class="text-xs font-bold font-heading truncate ${isSelected ? 'text-emerald-950' : 'text-slate-800'}">
             ${cleanName}
           </span>
         </div>
-        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${
-          isSelected ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'
+        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg shrink-0 ${
+          isSelected ? 'bg-emerald-200/90 text-emerald-900 border border-emerald-300/60' : 'bg-slate-200/80 text-slate-600'
         }">
           ${prog.id}
         </span>
       </div>
       <div class="flex items-center gap-2 text-[11px] ${isSelected ? 'text-emerald-700 font-semibold' : 'text-slate-500'}">
-        <span class="flex items-center gap-1"><i data-lucide="flask-conical" class="w-3 h-3"></i> ${prog.count} lotes</span>
-        <span>&bull;</span>
-        <span class="flex items-center gap-1"><i data-lucide="printer" class="w-3 h-3"></i> ${prog.total_labels} etiq.</span>
+        <span class="flex items-center gap-1"><i data-lucide="flask-conical" class="w-3 h-3 text-emerald-600"></i> ${prog.count} productos registrados</span>
       </div>
     `;
 
@@ -1377,14 +1517,14 @@ function renderDatePills() {
   // Chip "Todos los lotes"
   const allBtn = document.createElement("button");
   const isAllSelected = state.selectedDate === null;
-  allBtn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 border ${
+  allBtn.className = `px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 border ${
     isAllSelected 
-      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/25 ring-2 ring-emerald-600/20" 
-      : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-slate-200/80 shadow-2xs"
+      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-600/20" 
+      : "bg-slate-100/90 text-slate-600 hover:bg-slate-200/90 hover:text-slate-900 border-slate-200/80 shadow-2xs"
   }`;
   allBtn.innerHTML = `
     <span>Todos</span>
-    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${isAllSelected ? 'bg-emerald-700 text-emerald-50' : 'bg-slate-200/80 text-slate-500'}">${state.applications.length}</span>
+    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${isAllSelected ? 'bg-emerald-700 text-emerald-50' : 'bg-slate-200/90 text-slate-500'}">${state.applications.length}</span>
   `;
   allBtn.addEventListener("click", () => {
     state.selectedDate = null;
@@ -1398,17 +1538,17 @@ function renderDatePills() {
   available.forEach(d => {
     const isSelected = state.selectedDate === d.iso;
     const btn = document.createElement("button");
-    btn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 flex items-center gap-1.5 border ${
+    btn.className = `px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 border ${
       isSelected 
-        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/25 ring-2 ring-emerald-600/20" 
-        : "bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-slate-200/80 shadow-2xs"
+        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-600/20" 
+        : "bg-slate-100/90 text-slate-600 hover:bg-slate-200/90 hover:text-slate-900 border-slate-200/80 shadow-2xs"
     }`;
     
     const count = state.applications.filter(a => a.fecha.iso === d.iso).length;
     
     btn.innerHTML = `
       <span>${d.display}</span>
-      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${isSelected ? 'bg-emerald-700 text-emerald-50' : 'bg-slate-200/80 text-slate-500'}">${count}</span>
+      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${isSelected ? 'bg-emerald-700 text-emerald-50' : 'bg-slate-200/90 text-slate-500'}">${count}</span>
     `;
 
     btn.addEventListener("click", () => {
@@ -1789,9 +1929,9 @@ function renderApplicationsList() {
     const pictosReales = (app.base_info.pictogramas || []).filter(p => p.has_image);
 
     const card = document.createElement("div");
-    card.className = `rounded-xl p-4 border transition-all duration-200 cursor-pointer hover:-translate-y-0.5 hover:shadow-md ${
+    card.className = `rounded-2xl p-4 sm:p-5 border transition-all duration-200 cursor-pointer hover:-translate-y-0.5 hover:shadow-card ${
       isActive 
-        ? "bg-emerald-50/25 border-slate-200 border-l-4 border-l-emerald-600 shadow-sm ring-1 ring-emerald-600/10" 
+        ? "bg-emerald-50/30 border-slate-200 border-l-4 border-l-emerald-600 shadow-sm ring-1 ring-emerald-600/15" 
         : "bg-white border-slate-200/90 hover:border-slate-300 shadow-2xs"
     }`;
 
@@ -1802,8 +1942,8 @@ function renderApplicationsList() {
         </div>
 
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1 flex-wrap">
-            <span class="font-bold text-slate-900 text-sm truncate">${app.producto}</span>
+          <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span class="font-bold text-slate-900 text-sm font-heading truncate">${app.producto}</span>
             <span class="text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full shadow-2xs ${
               isDanger ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
             }">
@@ -2415,9 +2555,14 @@ function printActiveLabel() {
   renderAndTriggerPrint(labelsToPrint);
 }
 
-function renderAndTriggerPrint(labelsToPrint) {
+async function renderAndTriggerPrint(labelsToPrint) {
   const labelWord = labelsToPrint.length === 1 ? "etiqueta" : "etiquetas";
-  if (!window.confirm(`Vas a imprimir ${labelsToPrint.length} ${labelWord}. ¿Continuar?`)) {
+  const confirmed = await showConfirmDialog(
+    "Confirmar Impresión",
+    `Vas a imprimir ${labelsToPrint.length} ${labelWord}. ¿Deseas continuar?`,
+    { confirmText: "Imprimir", cancelText: "Cancelar" }
+  );
+  if (!confirmed) {
     return;
   }
   const layout = dom.selectPrintLayout ? dom.selectPrintLayout.value : "continuous";

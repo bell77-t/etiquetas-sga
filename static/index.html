@@ -3,36 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SGA Label Studio - Visor y Generador de Etiquetas Fitosanitarias</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>ETIQUETA LABEL - Sistema de Impresión de Etiquetas SGA</title>
+  <meta name="description" content="ETIQUETA LABEL - Sistema de Impresión y Control de Etiquetas SGA / GHS para Fitosanitarios y Fertirriego.">
+  
+  <!-- Open Graph Basic Tags -->
+  <meta property="og:title" content="ETIQUETA LABEL">
+  <meta property="og:description" content="Sistema de Impresión y Control de Etiquetas SGA / GHS">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/static/img/logo.svg">
+  
+  <!-- Favicon & PWA Manifest -->
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Google Fonts API (Plus Jakarta Sans, Outfit, JetBrains Mono) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS (Pinned Release) -->
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            display: ['"Outfit"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
           colors: {
             brand: {
               50: '#ecfdf5',
               100: '#d1fae5',
+              200: '#a7f3d0',
+              300: '#6ee7b7',
+              400: '#34d399',
               500: '#10b981',
               600: '#059669',
               700: '#047857',
               800: '#065f46',
               900: '#064e3b',
+              950: '#022c22',
             }
           },
           boxShadow: {
-            '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
-            'paper': '0 20px 25px -5px rgba(148, 163, 184, 0.35), 0 8px 10px -6px rgba(148, 163, 184, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.06)'
+            '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+            'xs': '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+            'card': '0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.05)',
+            'glow': '0 0 20px -3px rgba(16, 185, 129, 0.3)',
+            'paper': '0 20px 35px -5px rgba(148, 163, 184, 0.28), 0 8px 15px -6px rgba(148, 163, 184, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06)'
           }
         }
       }
     }
   </script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Lucide Icons (Pinned Release) -->
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
+<body class="bg-slate-50 min-h-screen text-slate-900 flex flex-col antialiased">
   <!-- =========================================================
        PANTALLA DE AUTENTICACIÓN (LOGIN & REGISTER) CON ANIMACIONES
        ========================================================= -->
@@ -49,14 +80,12 @@
     <div class="relative w-full max-w-md auth-glass-card rounded-3xl p-6 sm:p-8 space-y-6 text-white my-auto animate-scale-pop z-10">
       <!-- Header / Logo -->
       <div class="text-center space-y-2">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 ring-2 ring-white/20 mx-auto transform hover:rotate-6 transition-transform duration-300">
-          <i data-lucide="shield-check" class="w-7 h-7"></i>
-        </div>
-        <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-          <span>SGA Label Studio</span>
+        <img src="/static/img/logo.svg" alt="ETIQUETA LABEL Logo" class="w-14 h-14 rounded-2xl shadow-lg shadow-emerald-500/30 ring-2 ring-white/20 mx-auto transform hover:rotate-6 transition-transform duration-300">
+        <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2 font-heading">
+          <span>ETIQUETA LABEL</span>
           <span class="text-[10px] tracking-wide font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">v2.4</span>
         </h2>
-        <p class="text-xs text-slate-400 font-medium">Control de Acceso Fitosanitario SGA &bull; ICA</p>
+        <p class="text-xs text-slate-400 font-medium">Control de Acceso e Impresión de Etiquetas SGA</p>
       </div>
 
       <!-- Selector de Pestañas (Login / Register) -->
@@ -169,25 +198,23 @@
   <div id="app-root" class="flex flex-col flex-1">
     
     <!-- Top Navbar -->
-    <header class="bg-slate-900/95 text-white sticky top-0 z-30 shadow-lg border-b border-slate-800 backdrop-blur-md">
+    <header class="bg-slate-950/90 text-white sticky top-0 z-30 shadow-md border-b border-slate-800/80 backdrop-blur-lg">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         <!-- Logo / Titulo con badge de cumplimiento normativo -->
         <div class="flex items-center space-x-3.5">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/25 ring-1 ring-white/20">
-            <i data-lucide="tag" class="w-5 h-5"></i>
-          </div>
+          <img src="/static/img/logo.svg" alt="ETIQUETA LABEL Logo" class="w-10 h-10 rounded-xl shadow-md shadow-emerald-500/25 ring-1 ring-white/20">
           <div>
             <div class="flex items-center gap-2">
-              <h1 class="text-base font-extrabold tracking-tight text-white">
-                SGA Label Studio
+              <h1 class="text-base font-extrabold tracking-tight text-white font-heading">
+                ETIQUETA LABEL
               </h1>
-              <span class="text-[10px] tracking-wide font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full shadow-2xs">v2.4 Enterprise</span>
+              <span class="text-[10px] tracking-wide font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full shadow-2xs">v2.4 Enterprise</span>
             </div>
             <p class="text-[11px] text-slate-400 font-medium flex items-center gap-1.5">
-              <span>Visor y Generador de Mezclas Fitosanitarias</span>
+              <span>Sistema de Impresión y Control de Etiquetas</span>
               <span class="text-slate-600">&bull;</span>
-              <span class="text-emerald-400/90 font-mono text-[10px]">ICA &bull; GlobalGAP &bull; SGA</span>
+              <span class="text-emerald-400/90 font-mono text-[10px]">SGA / GHS</span>
             </p>
           </div>
         </div>
@@ -195,7 +222,7 @@
         <!-- Acciones Principales y Perfil de Usuario -->
         <div class="flex items-center space-x-2">
           <!-- Chip de Usuario Autenticado -->
-          <div id="user-profile-badge" class="hidden sm:flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 px-2.5 py-1.5 rounded-xl shadow-xs">
+          <div id="user-profile-badge" class="hidden sm:flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl shadow-xs">
             <div class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold ring-1 ring-emerald-500/30">
               <i data-lucide="user" class="w-3.5 h-3.5"></i>
             </div>
@@ -203,25 +230,19 @@
               <span id="user-display-name" class="text-xs font-bold text-slate-200 block leading-tight">Operario</span>
               <span id="user-role-badge" class="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">OPERARIO</span>
             </div>
-            <button id="btn-logout" class="ml-1 p-1 text-slate-400 hover:text-red-400 hover:bg-slate-700/60 rounded-md transition" title="Cerrar sesión">
+            <button id="btn-logout" class="ml-1 p-1 text-slate-400 hover:text-red-400 hover:bg-slate-800/80 rounded-md transition" title="Cerrar sesión" aria-label="Cerrar sesión de usuario">
               <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
             </button>
           </div>
 
-          <!-- Botón Móvil / Red Local -->
-          <button id="btn-network-info" class="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Conectar smartphone o tablet en red local (PWA)">
-            <i data-lucide="smartphone" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span class="hidden md:inline">Móvil / Red</span>
-          </button>
-
           <!-- Botón Recargar Excel en caliente -->
-          <button id="btn-reload" class="group flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Releer archivos Excel en caliente">
+          <button id="btn-reload" class="group flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition border border-slate-700/80 shadow-xs hover:border-slate-600 active:scale-[0.98]" title="Releer archivos Excel en caliente" aria-label="Recargar archivos Excel">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5 transition-transform duration-500 ease-out group-hover:rotate-180 text-slate-300"></i>
             <span class="hidden md:inline">Recargar</span>
           </button>
           
           <!-- Botón Configurar Directorio -->
-          <button id="btn-config" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800/90 rounded-lg transition-colors border border-transparent hover:border-slate-700/80 active:scale-[0.98]" title="Configurar Directorio">
+          <button id="btn-config" class="p-2 text-slate-400 hover:text-white hover:bg-slate-900/90 rounded-xl transition-colors border border-transparent hover:border-slate-700/80 active:scale-[0.98]" title="Configurar Directorio" aria-label="Configurar directorio de archivos Excel">
             <i data-lucide="folder-search" class="w-4 h-4"></i>
           </button>
         </div>
@@ -245,23 +266,24 @@
       <section class="lg:col-span-7 flex flex-col space-y-4">
         
         <!-- Barra de Búsqueda y Filtros -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200/80 space-y-4">
+        <div class="bg-white/95 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-card border border-slate-200/80 space-y-4">
           
-          <!-- Selector de Programa de Cultivo (Pestañas de Excel) -->
+          <!-- Selector de Catálogos Normativos: MIPE y MIRFE -->
           <div>
             <div class="flex items-center justify-between mb-2">
               <label class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
-                Programa de Cultivo (Pestañas Excel)
+                Catálogo Normativo (MIPE / MIRFE)
               </label>
               <span id="program-status-badge" class="text-[11px] font-semibold text-slate-400"></span>
             </div>
-            <div id="program-tabs" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
-              <!-- Se puebla dinamicamente -->
+            <div id="program-tabs" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- Se puebla dinamicamente con MIPE y MIRFE -->
             </div>
+          </div>
 
-            <!-- Banner de Calidad y Diagnóstico de Fichas SGA Incompletas -->
-            <div id="quality-container" class="hidden mt-3 p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl space-y-2 shadow-2xs">
+          <!-- Banner de Calidad y Diagnóstico de Fichas SGA Incompletas -->
+          <div id="quality-container" class="hidden p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl space-y-2 shadow-2xs">
               <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                   <div class="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
@@ -289,7 +311,6 @@
                 <!-- Se puebla dinamicamente -->
               </div>
             </div>
-          </div>
 
           <hr class="border-slate-100">
 
@@ -331,7 +352,7 @@
               <!-- Badge de resultados y botón Limpiar dentro del input -->
               <div class="absolute right-2.5 flex items-center gap-1.5">
                 <span id="search-match-badge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">0</span>
-                <button id="btn-clear-search" type="button" class="hidden p-1 text-slate-400 hover:text-slate-600 rounded-md transition hover:bg-slate-200/60" title="Limpiar búsqueda (Esc)">
+                <button id="btn-clear-search" type="button" class="hidden p-1 text-slate-400 hover:text-slate-600 rounded-md transition hover:bg-slate-200/60" title="Limpiar búsqueda (Esc)" aria-label="Limpiar búsqueda">
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
@@ -377,16 +398,16 @@
       <section class="lg:col-span-5 flex flex-col space-y-4">
         
         <!-- Contenedor del Preview -->
-        <div class="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 sticky top-20 flex flex-col space-y-4">
+        <div class="bg-white/95 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-card border border-slate-200/80 sticky top-20 flex flex-col space-y-4">
           
           <div class="flex items-center justify-between border-b border-slate-100 pb-3.5 flex-wrap gap-2">
             <div class="flex items-center gap-2.5">
-              <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs border border-emerald-100">
+              <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs border border-emerald-100/80">
                 <i data-lucide="eye" class="w-4 h-4"></i>
               </div>
               <div>
-                <h2 class="font-bold text-slate-800 text-sm tracking-tight">Vista Previa SGA</h2>
-                <span class="text-[10px] text-slate-400 font-medium">Plantilla Oficial A2:F12</span>
+                <h2 class="font-bold text-slate-900 text-sm tracking-tight font-heading">Vista Previa SGA</h2>
+                <span class="text-[10px] text-slate-400 font-medium font-sans">Plantilla Oficial A2:F12</span>
               </div>
             </div>
             
@@ -404,9 +425,9 @@
 
               <div class="inline-flex items-center bg-slate-100/90 p-1 rounded-lg border border-slate-200/80 text-xs shadow-2xs">
                 <span class="text-slate-500 font-semibold px-1 text-[11px]">Copias:</span>
-                <button id="btn-preview-copies-minus" type="button" class="w-5 h-5 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs">−</button>
-                <input type="number" id="input-preview-copies" value="1" min="1" max="500" class="w-7 text-center bg-transparent font-bold text-slate-800 text-xs focus:outline-none">
-                <button id="btn-preview-copies-plus" type="button" class="w-5 h-5 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs">+</button>
+                <button id="btn-preview-copies-minus" type="button" class="w-5 h-5 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs" aria-label="Disminuir copias">−</button>
+                <input type="number" id="input-preview-copies" value="1" min="1" max="500" class="w-7 text-center bg-transparent font-bold text-slate-800 text-xs focus:outline-none" aria-label="Número de copias">
+                <button id="btn-preview-copies-plus" type="button" class="w-5 h-5 bg-white hover:bg-slate-50 active:bg-slate-200 text-slate-700 font-bold rounded flex items-center justify-center text-xs transition border border-slate-200/70 shadow-2xs" aria-label="Aumentar copias">+</button>
               </div>
 
               <button id="btn-print-preview" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg font-bold transition shadow-sm hover:shadow-md hover:shadow-emerald-600/20 active:scale-[0.98]" title="Imprimir las copias seleccionadas">
@@ -424,15 +445,15 @@
             </div>
             
             <div class="flex items-center gap-1.5 flex-1 justify-end">
-              <button id="btn-prev-tank" type="button" class="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 font-bold transition shadow-2xs" title="Tanque anterior">
+              <button id="btn-prev-tank" type="button" class="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 font-bold transition shadow-2xs" title="Tanque anterior" aria-label="Tanque anterior">
                 <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
               </button>
               
-              <select id="select-active-tank" class="bg-white border border-slate-200 rounded-lg py-1 px-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none truncate max-w-[220px] shadow-2xs">
+              <select id="select-active-tank" class="bg-white border border-slate-200 rounded-lg py-1 px-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none truncate max-w-[220px] shadow-2xs" aria-label="Seleccionar tanque activo">
                 <!-- Opciones dinámicas -->
               </select>
 
-              <button id="btn-next-tank" type="button" class="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 font-bold transition shadow-2xs" title="Tanque siguiente">
+              <button id="btn-next-tank" type="button" class="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 font-bold transition shadow-2xs" title="Tanque siguiente" aria-label="Tanque siguiente">
                 <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
               </button>
             </div>
@@ -481,7 +502,7 @@
           <i data-lucide="folder" class="w-5 h-5 text-emerald-600"></i>
           Ubicación de Archivos Excel
         </h3>
-        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg">
+        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg" aria-label="Cerrar configuración">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -533,9 +554,9 @@
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Editor Bidireccional Excel</span>
-          <h3 id="edit-prod-title" class="font-bold text-slate-800 text-base">Editar Ficha SGA</h3>
+          <h3 id="edit-prod-title" class="font-bold text-slate-800 text-base font-heading">Editar Ficha SGA</h3>
         </div>
-        <button id="btn-close-edit-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+        <button id="btn-close-edit-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg" aria-label="Cerrar editor de producto">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -616,11 +637,11 @@
             <i data-lucide="clipboard-check" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="font-bold text-slate-800 text-base">Trazabilidad Fitosanitaria &bull; Certificaciones ICA y GlobalGAP</h3>
+            <h3 class="font-bold text-slate-800 text-base font-heading">Trazabilidad Fitosanitaria &bull; Certificaciones ICA y GlobalGAP</h3>
             <p class="text-xs text-slate-500">Historial inmutable de órdenes impresas, mezclas despachadas y ediciones.</p>
           </div>
         </div>
-        <button id="btn-close-audit-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+        <button id="btn-close-audit-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg" aria-label="Cerrar historial de auditoría">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -637,7 +658,7 @@
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
             <span>Exportar CSV (Auditoría ICA)</span>
           </a>
-          <button id="btn-refresh-audit" class="p-1.5 text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition" title="Refrescar">
+          <button id="btn-refresh-audit" class="p-1.5 text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition" title="Refrescar" aria-label="Refrescar historial de auditoría">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
           </button>
         </div>
@@ -672,52 +693,15 @@
     </div>
   </div>
 
-  <!-- Modal 4: Conexión Móvil / Red Local (PWA) -->
-  <div id="modal-network" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-200 text-center">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
-          <i data-lucide="smartphone" class="w-5 h-5 text-emerald-600"></i>
-          Acceso Móvil / Red Local
-        </h3>
-        <button id="btn-close-network-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <p class="text-xs text-slate-500">
-        Escanea este código QR con la cámara de tu smartphone o tablet para abrir el Visor de Etiquetas en la caseta de mezclas:
-      </p>
-
-      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 inline-block mx-auto shadow-inner">
-        <img id="network-qr-img" src="/api/qr_connect" alt="Código QR de Conexión" class="w-44 h-44 mx-auto rounded-lg">
-      </div>
-
-      <div class="space-y-1.5">
-        <span class="text-[11px] font-semibold text-slate-500 block">O ingresa manualmente la dirección IP:</span>
-        <div class="flex items-center justify-center gap-2">
-          <code id="network-ip-url" class="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded text-xs font-mono font-bold">http://localhost:8000</code>
-          <button id="btn-copy-ip" class="p-1 text-slate-500 hover:text-emerald-700 transition" title="Copiar enlace">
-            <i data-lucide="copy" class="w-4 h-4"></i>
-          </button>
-        </div>
-      </div>
-
-      <div class="pt-2 border-t border-slate-100">
-        <p class="text-[11px] text-slate-400">💡 Ambos dispositivos deben estar conectados a la misma red WiFi.</p>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal 5: Exportación Directa a PDF Vectorial -->
   <div id="modal-pdf" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
       <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2 font-heading">
           <i data-lucide="file-down" class="w-5 h-5 text-emerald-600"></i>
           Descargar PDF Vectorial
         </h3>
-        <button id="btn-close-pdf-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+        <button id="btn-close-pdf-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg" aria-label="Cerrar exportación PDF">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -770,14 +754,14 @@
             <i data-lucide="alert-triangle" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+            <h3 class="font-bold text-slate-800 text-base flex items-center gap-2 font-heading">
               <span>Productos con Información SGA Pendiente</span>
               <span id="modal-quality-badge-count" class="text-xs bg-amber-100 text-amber-900 border border-amber-200 font-bold px-2 py-0.5 rounded-full">0</span>
             </h3>
             <p id="modal-quality-program-name" class="text-xs text-slate-500">Listado de productos que no tienen pictogramas o frases H/P asignadas.</p>
           </div>
         </div>
-        <button id="btn-close-quality-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg">
+        <button id="btn-close-quality-modal" class="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg" aria-label="Cerrar diagnóstico">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -816,6 +800,67 @@
         </div>
         <button id="btn-close-quality-bottom" class="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cerrar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal 7: Diálogo de Confirmación & Alerta Personalizado (Glassmorphism / Rounded-2xl) -->
+  <div id="modal-confirm" class="fixed inset-0 bg-slate-950/70 modal-backdrop-blur z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl modal-dialog-enterprise max-w-md w-full p-6 space-y-5 border border-slate-200/90 shadow-2xl text-center animate-scale-pop">
+      <div id="confirm-icon-container" class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-sm">
+        <i id="confirm-icon" data-lucide="alert-triangle" class="w-7 h-7"></i>
+      </div>
+      <div class="space-y-1.5">
+        <h3 id="confirm-title" class="font-heading font-extrabold text-slate-900 text-lg">¿Confirmar Acción?</h3>
+        <p id="confirm-message" class="text-xs text-slate-600 leading-relaxed">Mensaje descriptivo del diálogo.</p>
+      </div>
+      <div class="flex items-center justify-center gap-3 pt-2">
+        <button id="btn-confirm-cancel" type="button" class="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition active:scale-[0.98]">
+          Cancelar
+        </button>
+        <button id="btn-confirm-ok" type="button" class="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-600/30 active:scale-[0.98]">
+          Aceptar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 8: Cambio Obligatorio de Contraseña (Primer Inicio de Sesión) -->
+  <div id="modal-change-password" class="fixed inset-0 bg-slate-950/80 modal-backdrop-blur z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl modal-dialog-enterprise max-w-md w-full p-6 sm:p-7 space-y-5 border border-slate-200/90 shadow-2xl animate-scale-pop">
+      <div class="text-center space-y-1.5">
+        <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-2xs">
+          <i data-lucide="key-round" class="w-6 h-6"></i>
+        </div>
+        <h3 class="font-heading font-extrabold text-slate-900 text-lg">Actualizar Contraseña Inicial</h3>
+        <p class="text-xs text-slate-500">Por seguridad normativa (ICA / SGA), debes cambiar tu contraseña predeterminada en este primer acceso.</p>
+      </div>
+      <form id="form-change-password" class="space-y-4">
+        <div id="change-pass-alert" class="hidden p-3 rounded-xl text-xs font-semibold flex items-center gap-2 bg-red-50 text-red-700 border border-red-200">
+          <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+          <span id="change-pass-alert-text">Mensaje</span>
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-700">Nueva Contraseña:</label>
+          <div class="relative flex items-center">
+            <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+            <input type="password" id="input-new-password" required minlength="4" placeholder="Mínimo 4 caracteres" class="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 rounded-xl py-2.5 pl-10 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition">
+            <button type="button" id="btn-toggle-new-pass" class="absolute right-3 p-1 text-slate-400 hover:text-slate-600 transition" aria-label="Ver u ocultar contraseña">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-700">Confirmar Nueva Contraseña:</label>
+          <div class="relative flex items-center">
+            <i data-lucide="shield-check" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+            <input type="password" id="input-confirm-password" required minlength="4" placeholder="Repite la nueva contraseña" class="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 rounded-xl py-2.5 pl-10 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition">
+          </div>
+        </div>
+        <button type="submit" id="btn-submit-change-pass" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/30 transition active:scale-[0.98] flex items-center justify-center gap-2">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Guardar Contraseña y Continuar</span>
+        </button>
+      </form>
     </div>
   </div>
 
