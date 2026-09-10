@@ -771,18 +771,18 @@ def get_ficha_seguridad(code_or_name: str, user=Depends(current_user)):
 def get_manifest():
     """Manifest para instalación PWA en teléfonos y tablets."""
     return {
-        "name": "SGA Label Studio",
-        "short_name": "SGA Studio",
-        "description": "Visor y Generador de Etiquetas Fitosanitarias SGA",
+        "name": "ETIQUETA LABEL",
+        "short_name": "ETIQUETA LABEL",
+        "description": "Sistema de Impresión y Control de Etiquetas SGA / GHS",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#0f172a",
         "theme_color": "#059669",
         "icons": [
             {
-                "src": "/static/picto/GHS07.jpg",
-                "sizes": "192x192",
-                "type": "image/jpeg"
+                "src": "/static/img/logo.svg",
+                "sizes": "192x192 512x512",
+                "type": "image/svg+xml"
             }
         ]
     }
@@ -801,12 +801,13 @@ def serve_index():
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
-    return {"message": "Visor de Etiquetas SGA - Frontend no cargado"}
+    return {"message": "ETIQUETA LABEL - Frontend no cargado"}
 
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
     ip = get_local_ip()
-    print(f"Iniciando servidor en red local:")
-    print(f"  - Localhost:    http://127.0.0.1:8000")
-    print(f"  - Red Local IP: http://{ip}:8000")
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
+    print(f"Iniciando servidor ETIQUETA LABEL:")
+    print(f"  - Localhost:    http://127.0.0.1:{port}")
+    print(f"  - Red Local IP: http://{ip}:{port}")
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
