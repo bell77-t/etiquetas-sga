@@ -35,15 +35,16 @@ def find_data_directory(custom_path: Optional[str] = None) -> Path:
     if os.environ.get("SGA_DATA_DIR"):
         candidates.append(Path(os.environ["SGA_DATA_DIR"]).expanduser())
 
-    # El Excel puede vivir junto al proyecto, en data/ o en el catalogo incluido.
+    # Prioridad: variable SGA_DATA_DIR, carpeta local de Alejandra, o carpeta del proyecto
     candidates.extend([
+        LEGACY_DATA_DIR,
+        Path(r"C:\Users\alexc\Downloads\Alejandra\Alejandra"),
         PROJECT_ROOT,
         PROJECT_ROOT / "data",
         BUNDLED_CATALOG_DIR,
         Path.cwd(),
         Path.cwd() / "data",
         Path.cwd() / "data" / "catalog",
-        LEGACY_DATA_DIR,
     ])
 
     seen = set()
@@ -636,6 +637,16 @@ class DataManager:
         self.base_path = base_path
         self.base_catalog = load_base_catalog(base_path, self.picto_dir)
 
+        # Registrar marcas de tiempo de los archivos
+        if not hasattr(self, "_file_mtimes"):
+            self._file_mtimes = {}
+        for f in [app_path, base_path]:
+            if f and f.exists():
+                try:
+                    self._file_mtimes[str(f.resolve())] = f.stat().st_mtime
+                except OSError:
+                    pass
+
         # Extraer lista única de los 228 productos maestros desde Base_Actualizada.xlsx (Columna B: Nombre del Producto)
         seen_master_names = set()
         self.master_products = []
@@ -846,8 +857,42 @@ class DataManager:
         self.available_dates = sorted(dates_list, key=lambda x: x["iso"], reverse=True)
         self.available_products = sorted(list(products_seen))
 
+    def check_and_reload_if_modified(self) -> bool:
+        """Detecta automáticamente si alguno de los archivos Excel de Alejandra fue modificado y recarga en caliente."""
+        if not hasattr(self, "_file_mtimes"):
+            self._file_mtimes = {}
+
+        files_to_track = [self.data_dir / "aplicacion.xlsm"]
+        if hasattr(self, "base_path") and self.base_path and self.base_path.exists():
+            files_to_track.append(self.base_path)
+        if hasattr(self, "mipe_path") and self.mipe_path and self.mipe_path.exists():
+            files_to_track.append(self.mipe_path)
+
+        has_changed = False
+        for f in files_to_track:
+            if f.exists():
+                try:
+                    curr_mtime = f.stat().st_mtime
+                    f_key = str(f.resolve())
+                    prev_mtime = self._file_mtimes.get(f_key)
+                    if prev_mtime is not None and curr_mtime > prev_mtime:
+                        has_changed = True
+                    self._file_mtimes[f_key] = curr_mtime
+                except OSError:
+                    pass
+
+        if has_changed and self.last_loaded is not None:
+            try:
+                print(f"[AUTO-RELOAD] Modificación detectada en {self.data_dir}. Recargando datos de Excel...")
+                self.load_all()
+                return True
+            except Exception as e:
+                print(f"[AUTO-RELOAD ERROR] No se pudo recargar: {e}")
+        return False
+
     def get_program_data(self, program_id: Optional[str] = None) -> Dict[str, Any]:
         """Obtiene datos de un programa sin cambiar el estado compartido del servidor."""
+        self.check_and_reload_if_modified()
         selected_id = program_id or self.current_program
         if selected_id not in self.programs:
             raise KeyError(selected_id)
